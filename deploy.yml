@@ -1,0 +1,109 @@
+# .github/workflows/deploy.yml
+# CI/CD: Test → Lint → Deploy to Cloudflare Workers
+#
+# Required GitHub Secrets (Settings → Secrets → Actions):
+#   CLOUDFLARE_API_TOKEN   — CF API token with Workers:Edit permission
+#   CLOUDFLARE_ACCOUNT_ID  — Your Cloudflare account ID
+
+name: Deploy to Cloudflare Workers
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ────────────────────────────────────────────────────────────
+  # JOB 1: Lint & Test
+  # ────────────────────────────────────────────────────────────
+  test:
+    name: Lint & Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint --if-present
+
+      - name: Run tests
+        run: npm test --if-present
+
+  # ────────────────────────────────────────────────────────────
+  # JOB 2: Deploy Worker (main branch only)
+  # ────────────────────────────────────────────────────────────
+  deploy-worker:
+    name: Deploy Worker → Cloudflare
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Deploy Worker
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy --env production
+
+      - name: Notify deployment
+        if: success()
+        run: |
+          echo "✅ Worker deployed successfully"
+          echo "Environment: production"
+          echo "Commit: ${{ github.sha }}"
+
+  # ────────────────────────────────────────────────────────────
+  # JOB 3: Deploy React App → Cloudflare Pages (if using Pages)
+  # ────────────────────────────────────────────────────────────
+  deploy-pages:
+    name: Deploy React App → Cloudflare Pages
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Build React app
+        working-directory: ./frontend
+        env:
+          VITE_WORKER_URL: ${{ secrets.VITE_WORKER_URL }}
+        run: npm run build
+
+      - name: Publish to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy ./frontend/dist --project-name=efficient-finance-widget
