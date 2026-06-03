@@ -25,7 +25,7 @@ export async function getSeritiToken(env) {
   }
 
   // Fetch new token
-  const response = await fetch(`${SERITI_BASE}/api/Auth/token`, {
+  const response = await fetch(`${SERITI_BASE}/api/Authentication/token`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
