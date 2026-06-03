@@ -26,13 +26,11 @@ export async function handlePrediction(request, ctx, jsonResponse) {
   }
 
   const seritiPayload = {
-    request: {
-      applicantId: applicantId,
-      grossIncome: Number(25060) || 0,
-      netIncome: Number(21384) || 0
-      livingExpenses: Number(livingExpenses) || 0,
-      ...(!noSAID && idNumber ? { IDNumber: 9406215209081 } : { hasNoSAID: true }),
-    }
+    applicantId,
+    grossIncome: Number(grossIncome) || 0,
+    netIncome: Number(body.netIncome) || 0,
+    emailAddress: body.email || '',
+    ...(!noSAID && idNumber ? { idNumber } : {}),
   };
 
   let result;
@@ -51,15 +49,16 @@ export async function handlePrediction(request, ctx, jsonResponse) {
     Medium: { label: 'Good news',    headline: 'You have a good chance of qualifying!',     body: 'Your profile looks promising. Complete your application and we\'ll be in touch shortly.' },
     High:   { label: 'Great news',   headline: 'You\'re likely to qualify!',                body: 'Your profile looks great. Submit your application and we\'ll help you get into your next car.' },
   };
-  const predKey = typeof result.prediction === 'string'
-    ? result.prediction.charAt(0).toUpperCase() + result.prediction.slice(1).toLowerCase()
-    : 'Low';
+
+  const predResponse = result.predictionResponse || {};
+  const predNum = predResponse.prediction ?? -1;
+  const predKey = predNum === 2 ? 'High' : predNum === 1 ? 'Medium' : 'Low';
 
   return jsonResponse({
     prediction: predictionMap[predKey] || predictionMap.Low,
-    reason: result.reason,
-    estimatedApprovalAmount: result.estimatedApprovalAmount,
-    monthlyInstalment: result.estimatedFinanceSpend,
+    reason: predResponse.reason,
+    estimatedApprovalAmount: predResponse.estimatedApprovalAmount,
+    monthlyInstalment: predResponse.estimatedFinanceSpend,
   }, 200, origin, env);
 }
 
