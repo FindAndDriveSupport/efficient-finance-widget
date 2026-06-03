@@ -29,7 +29,7 @@ export async function handlePrediction(request, ctx, jsonResponse) {
       applicantId,
       grossIncome: Number(grossIncome),
       livingExpenses: Number(livingExpenses) || 0,
-      ...(hasNoSAID ? { hasNoSAID: true } : { idNumber }),
+      ...(hasNoSAID ? { hasNoSAID: true } : { IDNumber: idNumber }),
     }
   };
 
