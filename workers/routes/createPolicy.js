@@ -118,7 +118,7 @@ function buildEdithXML(data, env, dealer, salesRef) {
   const d = data; // shorthand
 
   return `<?xml version="1.0" encoding="utf-8"?>
-<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tem="http://tempuri.org/">
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tem="http://ws.edith.co.za/EdithServices/PolicyServicesV300">
   <soap:Body>
     <tem:CreatePolicy>
       <tem:policy>
