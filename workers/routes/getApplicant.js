@@ -11,7 +11,7 @@ import { seritiRequest } from '../services/seritiAuth.js';
 export async function handleGetApplicant(request, ctx, jsonResponse) {
   const { env, origin } = ctx;
   const url = new URL(request.url);
-  const applicantId = url.searchParams.get('applicantId');
+  const applicantId = url.pathname.split('/').pop();
 
   if (!applicantId) {
     return jsonResponse({ error: 'Missing applicantId' }, 400, origin, env);
@@ -47,6 +47,8 @@ export async function handleGetApplicant(request, ctx, jsonResponse) {
     // Address
     address1: address.line1,
     suburb: address.township,
+    township: address.township,
+    postalCode: address.postalCode,
     city: address.city,
     province: address.province,
     postCode: address.postalCode,
@@ -59,5 +61,6 @@ export async function handleGetApplicant(request, ctx, jsonResponse) {
     // Financials
     grossIncome: financials.grossIncome,
     netIncome: financials.netIncome,
+    bureauExpenses: financials.bureauExpenses,
   }, 200, origin, env);
 }
