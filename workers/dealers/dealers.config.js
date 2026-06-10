@@ -196,6 +196,26 @@ export const DEALERS = {
       vehicleQueryParams: true,
     },
   },
+
+  'find-and-drive-test': {
+    name: 'Find and Drive Test',
+    branchCode: 'SRT001EM',
+    allowedDomains: [
+      'findndrive.co.za',
+    ],
+    mixpanelToken: '',
+    theme: {
+      primary: '#6c3fc5',
+      gradient: 'linear-gradient(135deg, #6c3fc5 0%, #c026d3 100%)',
+      fontFamily: "'Inter', sans-serif",
+      borderRadius: '12px',
+    },
+    features: {
+      showDeposit: true,
+      showCurrentFinance: true,
+      vehicleQueryParams: true,
+    },
+  },
 // ── Lookup helpers ────────────────────────────────────────────
 
 /**
