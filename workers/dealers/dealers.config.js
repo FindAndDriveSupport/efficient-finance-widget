@@ -128,6 +128,28 @@ export const DEALERS = {
       vehicleQueryParams: true,
     },
   },
+
+  'yonda-bike': {
+    name: 'Yonda Bike',
+    branchCode: 'YOND001',
+    allowedDomains: [
+      'yonda.co.za',
+      'seritifinance.findndrive.co.za',
+    ],
+    mixpanelToken: '',
+    financeType: 'bike',
+    theme: {
+      primary: '#0154fc',
+      gradient: 'linear-gradient(135deg, #0154fc 0%, #0154fc 100%)',
+      fontFamily: "'Inter', sans-serif",
+      borderRadius: '12px',
+    },
+    features: {
+      showDeposit: true,
+      showCurrentFinance: true,
+      vehicleQueryParams: true,
+    },
+  },
 // ── Lookup helpers ────────────────────────────────────────────
 
 /**
