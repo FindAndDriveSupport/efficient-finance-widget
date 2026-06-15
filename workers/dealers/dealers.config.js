@@ -106,28 +106,6 @@ export const DEALERS = {
   // ─────────────────────────────────────────────────────────────
 };
 
-
-  'keitzman-finance': {
-    name: 'Keitzman Finance',
-    branchCode: 'KAEF001',
-    allowedDomains: [
-      'keitzmanfinance.co.za',
-      'seritifinance.findndrive.co.za',
-    ],
-    mixpanelToken: '',
-    financeType: 'vehicle',
-    theme: {
-      primary: '#c0392b',
-      gradient: 'linear-gradient(135deg, #c0392b 0%, #c0392b 100%)',
-      fontFamily: "'Inter', sans-serif",
-      borderRadius: '12px',
-    },
-    features: {
-      showDeposit: true,
-      showCurrentFinance: true,
-      vehicleQueryParams: true,
-    },
-  },
 // ── Lookup helpers ────────────────────────────────────────────
 
 /**
