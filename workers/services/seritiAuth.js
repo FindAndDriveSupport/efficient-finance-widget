@@ -3,35 +3,57 @@
  * Manages Seriti API bearer token with automatic refresh (token expires hourly).
  * Uses Cloudflare KV for token caching across Worker instances.
  *
- * Required KV namespace: SERITI_CACHE (bind in wrangler.toml)
- * Required secrets: SERITI_API_KEY, SERITI_API_SECRET
+ * Per-dealer credentials stored in KV as:
+ *   SERITI_KEY_{dealerKey}
+ *   SERITI_SECRET_{dealerKey}
+ *
+ * Falls back to global SERITI_API_KEY / SERITI_API_SECRET env vars.
  */
 
 const SERITI_BASE = 'https://seritiapi.findndrive.co.za';
-const TOKEN_CACHE_KEY = 'seriti_bearer_token';
-const TOKEN_BUFFER_SECONDS = 120; // refresh 2 min before expiry
+const TOKEN_BUFFER_SECONDS = 120;
 
-/**
- * Get a valid Seriti bearer token.
- * Checks KV cache first; fetches a new one if missing or expired.
- */
-export async function getSeritiToken(env) {
+function tokenCacheKey(dealerKey) {
+  return dealerKey ? `seriti_token_${dealerKey}` : 'seriti_bearer_token';
+}
+
+async function getDealerCredentials(env, dealerKey) {
+  if (!dealerKey || !env.SERITI_CACHE) {
+    return { apiKey: env.SERITI_API_KEY, apiSecret: env.SERITI_API_SECRET };
+  }
+  const [apiKey, apiSecret] = await Promise.all([
+    env.SERITI_CACHE.get(`SERITI_KEY_${dealerKey}`),
+    env.SERITI_CACHE.get(`SERITI_SECRET_${dealerKey}`),
+  ]);
+  return {
+    apiKey: apiKey || env.SERITI_API_KEY,
+    apiSecret: apiSecret || env.SERITI_API_SECRET,
+  };
+}
+
+export async function getSeritiToken(env, dealerKey) {
+  const cacheKey = tokenCacheKey(dealerKey);
+
   // Try cache first
   if (env.SERITI_CACHE) {
-    const cached = await env.SERITI_CACHE.get(TOKEN_CACHE_KEY, 'json');
+    const cached = await env.SERITI_CACHE.get(cacheKey, 'json');
     if (cached && cached.token && cached.expiresAt > Date.now()) {
       return cached.token;
     }
+  }
+
+  // Get dealer-specific or global credentials
+  const { apiKey, apiSecret } = await getDealerCredentials(env, dealerKey);
+
+  if (!apiKey || !apiSecret) {
+    throw new Error(`Seriti credentials not found for dealer: ${dealerKey || 'global'}`);
   }
 
   // Fetch new token
   const response = await fetch(`${SERITI_BASE}/api/Authentication/token`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      ApiKeyId: env.SERITI_API_KEY,
-      apiSecret: env.SERITI_API_SECRET,
-    }),
+    body: JSON.stringify({ ApiKeyId: apiKey, apiSecret }),
   });
 
   if (!response.ok) {
@@ -41,26 +63,21 @@ export async function getSeritiToken(env) {
 
   const data = await response.json();
   const token = data.token || data.access_token || data.accessToken;
-
   if (!token) throw new Error('Seriti auth: no token in response');
 
-  // Cache for 58 minutes (token is 60 min, buffer 2 min)
+  // Cache for 58 minutes
   if (env.SERITI_CACHE) {
     const expiresAt = Date.now() + (58 * 60 * 1000);
-    await env.SERITI_CACHE.put(TOKEN_CACHE_KEY, JSON.stringify({ token, expiresAt }), {
-      expirationTtl: 3480, // 58 min in seconds
+    await env.SERITI_CACHE.put(cacheKey, JSON.stringify({ token, expiresAt }), {
+      expirationTtl: 3480,
     });
   }
 
   return token;
 }
 
-/**
- * Make an authenticated request to the Seriti API.
- */
-export async function seritiRequest(path, options = {}, env) {
-  const token = await getSeritiToken(env);
-
+export async function seritiRequest(path, options = {}, env, dealerKey) {
+  const token = await getSeritiToken(env, dealerKey);
   const response = await fetch(`${SERITI_BASE}${path}`, {
     ...options,
     headers: {
@@ -69,14 +86,11 @@ export async function seritiRequest(path, options = {}, env) {
       ...(options.headers || {}),
     },
   });
-
   const text = await response.text();
   let data;
   try { data = JSON.parse(text); } catch { data = { raw: text }; }
-
   if (!response.ok) {
     throw new Error(`Seriti API error (${response.status}): ${JSON.stringify(data)}`);
   }
-
   return data;
 }

@@ -38,7 +38,7 @@ export async function handlePrediction(request, ctx, jsonResponse) {
     result = await seritiRequest('/api/Financing/Prediction', {
       method: 'POST',
       body: JSON.stringify(seritiPayload),
-    }, env);
+    }, env, dealerConfig?.key);
   } catch (err) {
     return jsonResponse({ error: 'Seriti API error', details: err.message }, 502, origin, env);
   }

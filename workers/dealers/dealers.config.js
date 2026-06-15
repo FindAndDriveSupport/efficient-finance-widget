@@ -10,8 +10,8 @@
  *   - Edith branch code
  *   - Whitelisted embed domains
  *   - UI theme (colours, logo)
- *   - Mixpanel tracking token
  *   - Feature flags
+ *   - Finance Type
  */
 
 export const DEALERS = {
@@ -21,13 +21,15 @@ export const DEALERS = {
   'findndrive': {
     name: 'FindnDrive',
     branchCode: 'SRT001EM',                    // ← Edith BranchCode
+    financeType: 'vehicle',
     allowedDomains: [
       'findndrive.co.za',
+      'seritifinancedev.findndrive.co.za',
+      'seritifinance.findndrive.co.za',
       'www.findndrive.co.za',
       'localhost',
       'findanddrivesupport-e-fficient-ui.still-fire-1c3d.workers.dev',
     ],
-    mixpanelToken: 'YOUR_MIXPANEL_TOKEN',    // ← single MP account; refer domain identifies dealer
     theme: {
       primary: '#6C3FC5',
       primaryLight: '#8B5CF6',
@@ -50,11 +52,11 @@ export const DEALERS = {
   'dealer-xyz': {
     name: 'Car Dealer XYZ',
     branchCode: 'XYZ002',
+    financeType: 'vehicle',
     allowedDomains: [
       'dealerxyz.co.za',
       'www.dealerxyz.co.za',
     ],
-    mixpanelToken: 'YOUR_MIXPANEL_TOKEN',   // same MP account; domain differentiates
     theme: {
       primary: '#E63946',
       primaryLight: '#FF6B6B',

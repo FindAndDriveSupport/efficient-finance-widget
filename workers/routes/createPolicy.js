@@ -11,6 +11,12 @@ import { STATUS_CODES, SYSTEM_MESSAGES, FIELD_ERRORS, parseEdithErrors } from '.
 
 const EDITH_WSDL_DEFAULT = 'https://www.seritisolutions.co.za/demows/PolicyServicesV300.asmx';
 
+// YONDA Service Fee — defaults applied for financeType === 'bike'
+const YONDA_SERVICE_FEE = {
+  productOptionId: '9845',
+  price: '2990.00', // R2,990 including VAT
+};
+
 export async function handleCreatePolicy(request, ctx, jsonResponse) {
   const { env, dealerConfig, origin } = ctx;
 
@@ -119,6 +125,28 @@ export async function handleCreatePolicy(request, ctx, jsonResponse) {
 
 function buildEdithXML(data, env, dealer, salesRef) {
   const d = data;
+  const isBike = dealer.financeType === 'bike';
+
+  // ── Bank Accounts block (Policy-level, before Client) — bike only ──
+  const bankAccountsXml = (isBike && d.bankBranchCode) ? `
+        <tem:BankAccounts>
+          <tem:BankAccount>
+            ${d.bankAccountNumber ? `<tem:AccountNumber>${esc(d.bankAccountNumber)}</tem:AccountNumber>` : ''}
+            ${d.accountType      ? `<tem:AccountType>${esc(d.accountType.toUpperCase())}</tem:AccountType>` : ''}
+            <tem:BankBranchCode>${esc(d.bankBranchCode)}</tem:BankBranchCode>
+            <tem:PrimaryAccountInd>true</tem:PrimaryAccountInd>
+          </tem:BankAccount>
+        </tem:BankAccounts>` : '';
+
+  // ── Products array (top-level, sibling of Policy) — YONDA service fee ──
+  const productsXml = isBike ? `
+      <tem:Products>
+        <tem:Product>
+          <tem:ProductOptionId>${YONDA_SERVICE_FEE.productOptionId}</tem:ProductOptionId>
+          <tem:Price>${YONDA_SERVICE_FEE.price}</tem:Price>
+          <tem:SalesReferenceNumber>${esc(salesRef)}</tem:SalesReferenceNumber>
+        </tem:Product>
+      </tem:Products>` : '';
 
   return `<?xml version="1.0" encoding="utf-8"?>
 <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tem="http://ws.edith.co.za/EdithServices/PolicyServicesV300">
@@ -131,11 +159,12 @@ function buildEdithXML(data, env, dealer, salesRef) {
       <tem:Policy>
         <tem:BranchCode>${dealer.branchCode}</tem:BranchCode>
         <tem:SalesReferenceNumber>${salesRef}</tem:SalesReferenceNumber>
-        <tem:TransactionType>VEHICLE SALE</tem:TransactionType>
-        <tem:Category>PRIVATE</tem:Category>
+        <tem:TransactionType>${isBike ? 'MOTORBIKE SALE' : 'VEHICLE SALE'}</tem:TransactionType>
+        <tem:Category>PRIVATE</tem:Category>${bankAccountsXml}
         ${d.vehicleMake    ? `<tem:Manufacturer>${esc(d.vehicleMake)}</tem:Manufacturer>` : ''}
         ${d.vehicleModel   ? `<tem:Model>${esc(d.vehicleModel)}</tem:Model>` : ''}
         ${d.vehicleMm      ? `<tem:VehicleCode>${esc(d.vehicleMm)}</tem:VehicleCode>` : ''}
+        ${(d.vehicleMake || d.vehicleModel) ? `<tem:VehicleDescription>${esc([d.vehicleMake, d.vehicleModel].filter(Boolean).join(' '))}</tem:VehicleDescription>` : ''}
         ${d.estimatedApprovalAmount ? `<tem:RetailPrice>${d.estimatedApprovalAmount}</tem:RetailPrice>` : ''}
         <tem:NewUsed>USED</tem:NewUsed>
        <tem:Client>
@@ -145,6 +174,7 @@ function buildEdithXML(data, env, dealer, salesRef) {
           ${d.mobileNumber  ? `<tem:MobileNumber>${d.mobileNumber}</tem:MobileNumber>` : ''}
           ${d.emailAddress  ? `<tem:EmailAddress>${esc(d.emailAddress)}</tem:EmailAddress>` : ''}
           ${d.idNumber      ? `<tem:IDType>${esc(d.idType || 'RSA ID')}</tem:IDType><tem:IDNumber>${d.idNumber}</tem:IDNumber>` : '<tem:IDType>FOREIGN NATIONAL</tem:IDType>'}
+          ${d.gender ? `<tem:Gender>${esc(d.gender.toUpperCase())}</tem:Gender>` : ''}
           ${d.maritalStatus ? `<tem:MaritalStatus>${esc(d.maritalStatus)}</tem:MaritalStatus>` : ''}
           ${d.address1 ? `
           <tem:PhysicalAddress>
@@ -158,11 +188,11 @@ function buildEdithXML(data, env, dealer, salesRef) {
           ${d.physicalAddressDate  ? `<tem:PhysicalAddressDate>${esc(d.physicalAddressDate)}</tem:PhysicalAddressDate>` : ''}` : ''}
           ${d.nextOfKinFirstName ? `
           <tem:Relative>
-            <tem:FirstName>${esc(d.nextOfKinFirstName)}</tem:FirstName>
-            <tem:LastName>${esc(d.nextOfKinLastName || '')}</tem:LastName>
-            <tem:MobileNumber>${d.nextOfKinMobile || ''}</tem:MobileNumber>
-          </tem:Relative>
-          <tem:RelativeRelation>OTHER</tem:RelativeRelation>` : ''}
+            <tem:RelativeRelation>DISTANT</tem:RelativeRelation>
+              <tem:RelativeFirstName>${esc(d.nextOfKinFirstName)}</tem:RelativeFirstName>
+              <tem:RelativeLastName>${esc(d.nextOfKinLastName || '')}</tem:RelativeLastName>
+              <tem:RelativeMobileNumber>${d.nextOfKinMobile || ''}</tem:RelativeMobileNumber>
+          </tem:Relative>` : ''}
           ${d.employmentType ? `<tem:EmploymentType>${esc(d.employmentType)}</tem:EmploymentType>` : ''}
           ${d.employerName   ? `<tem:EmployerName>${esc(d.employerName)}</tem:EmployerName>` : ''}
           ${d.occupation     ? `<tem:Occupation>${esc(d.occupation)}</tem:Occupation>` : ''}
@@ -189,7 +219,7 @@ function buildEdithXML(data, env, dealer, salesRef) {
             <tem:IvxConsentInd>${d.financialAccessConsent ? 'true' : 'false'}</tem:IvxConsentInd>
           </tem:Consents>
         </tem:Client>
-      </tem:Policy>
+      </tem:Policy>${productsXml}
     </tem:CreatePolicy>
   </soap:Body>
 </soap:Envelope>`;

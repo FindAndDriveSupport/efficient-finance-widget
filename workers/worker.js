@@ -16,6 +16,7 @@ import { handlePreQual }       from './routes/preQual.js';
 import { handlePrediction }    from './routes/prediction.js';
 import { handleGetApplicant }  from './routes/getApplicant.js';
 import { handleCreatePolicy }  from './routes/createPolicy.js';
+import { handleSubmitDocuments }  from './routes/submitDocuments.js';
 import { handleDealerConfig }  from './routes/dealerConfig.js';
 import { handleAddressSearch } from './routes/addressSearch.js';
 
@@ -99,6 +100,11 @@ export default {
       // ── Edith: Create Policy (Step 3 submit) ──
       if (path === '/api/policy/create' && method === 'POST') {
         return handleCreatePolicy(request, ctx2, jsonResponse);
+      }
+
+      // ── Edith: Submit Documents (Fast Application) ──
+      if (path === '/api/policy/documents' && method === 'POST') {
+        return handleSubmitDocuments(request, ctx2, jsonResponse);
       }
 
       return jsonResponse({ error: 'Not found' }, 404, origin, env);
