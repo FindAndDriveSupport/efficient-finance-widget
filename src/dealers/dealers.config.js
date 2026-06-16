@@ -10,23 +10,26 @@
  *   - Edith branch code
  *   - Whitelisted embed domains
  *   - UI theme (colours, logo)
- *   - Mixpanel tracking token
  *   - Feature flags
+ *   - Finance type
  */
 
 export const DEALERS = {
   // ─────────────────────────────────────────────────────────────
-  // EXAMPLE DEALER 1 — FindnDrive (default / fallback)
+  // FindnDrive (default / fallback)
   // ─────────────────────────────────────────────────────────────
   'findndrive': {
     name: 'FindnDrive',
-    branchCode: 'FND001',                    // ← Edith BranchCode
+    branchCode: 'SRT001EM',
+    financeType: 'vehicle',
     allowedDomains: [
       'findndrive.co.za',
       'www.findndrive.co.za',
-      'localhost',                            // ← dev only; remove in production
+      'seritifinancedev.findndrive.co.za',
+      'seritifinance.findndrive.co.za',
+      'localhost',
+      'findanddrivesupport-e-fficient-ui.still-fire-1c3d.workers.dev',
     ],
-    mixpanelToken: 'YOUR_MIXPANEL_TOKEN',    // ← single MP account; refer domain identifies dealer
     theme: {
       primary: '#6C3FC5',
       primaryLight: '#8B5CF6',
@@ -39,33 +42,55 @@ export const DEALERS = {
     features: {
       showDeposit: true,
       showCurrentFinance: true,
-      vehicleQueryParams: true,              // accepts ?make=&model=&mm= in embed URL
+      vehicleQueryParams: true,
     },
   },
 
   // ─────────────────────────────────────────────────────────────
-  // EXAMPLE DEALER 2 — Car Dealer XYZ
+  // Keitzman Finance
   // ─────────────────────────────────────────────────────────────
-  'dealer-xyz': {
-    name: 'Car Dealer XYZ',
-    branchCode: 'XYZ002',
+  'keitzman-finance': {
+    name: 'Keitzman Finance',
+    branchCode: 'KAEF001',
+    financeType: 'vehicle',
     allowedDomains: [
-      'dealerxyz.co.za',
-      'www.dealerxyz.co.za',
+      'keitzmanfinance.co.za',
+      'keitzman-finance.seritifinance.findndrive.co.za',
+      'seritifinance.findndrive.co.za',
     ],
-    mixpanelToken: 'YOUR_MIXPANEL_TOKEN',   // same MP account; domain differentiates
     theme: {
-      primary: '#E63946',
-      primaryLight: '#FF6B6B',
-      primaryDark: '#9B0000',
-      gradient: 'linear-gradient(135deg, #E63946 0%, #FF6B6B 100%)',
+      primary: '#c0392b',
+      gradient: 'linear-gradient(135deg, #c0392b 0%, #c0392b 100%)',
       fontFamily: "'Inter', sans-serif",
-      borderRadius: '8px',
-      logoUrl: '/logos/dealer-xyz.svg',
+      borderRadius: '12px',
     },
     features: {
       showDeposit: true,
-      showCurrentFinance: false,
+      showCurrentFinance: true,
+      vehicleQueryParams: true,
+    },
+  },
+
+  // ─────────────────────────────────────────────────────────────
+  // Yonda Bike
+  // ─────────────────────────────────────────────────────────────
+  'yonda-bike': {
+    name: 'Yonda Bike',
+    branchCode: 'YOND001',
+    financeType: 'bike',
+    allowedDomains: [
+      'yonda.co.za',
+      'yonda-bike.seritifinance.findndrive.co.za',
+    ],
+    theme: {
+      primary: '#0154fc',
+      gradient: 'linear-gradient(135deg, #0154fc 0%, #0154fc 100%)',
+      fontFamily: "'Inter', sans-serif",
+      borderRadius: '12px',
+    },
+    features: {
+      showDeposit: true,
+      showCurrentFinance: true,
       vehicleQueryParams: true,
     },
   },
@@ -78,8 +103,8 @@ export const DEALERS = {
 // ── Lookup helpers ────────────────────────────────────────────
 
 /**
- * Get dealer config by branchCode query param or referring domain.
- * Priority: explicit ?dealer= param → referring domain match → null
+ * Get dealer config by dealerKey param or referring domain.
+ * Priority: explicit ?dealer= param → referring domain match → first dealer
  */
 export function getDealerConfig(dealerKey, referringDomain) {
   // 1. Explicit key (from query param ?dealer=findndrive)
@@ -97,7 +122,7 @@ export function getDealerConfig(dealerKey, referringDomain) {
     }
   }
 
-  // 3. Fallback to first dealer (or null — your choice)
+  // 3. Fallback to first dealer
   const [firstKey, firstConfig] = Object.entries(DEALERS)[0];
   return { key: firstKey, ...firstConfig };
 }
