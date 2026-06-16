@@ -1,168 +1,70 @@
-/**
+﻿/**
  * dealers.config.js
- *
- * ████████████████████████████████████████████████████████████████
- *  SINGLE SOURCE OF TRUTH — ALL DEALER SETTINGS LIVE HERE
- *  Add a dealer, change a theme, update branch codes — all in one place.
- * ████████████████████████████████████████████████████████████████
- *
- * Each dealer entry controls:
- *   - Edith branch code
- *   - Whitelisted embed domains
- *   - UI theme (colours, logo)
- *   - Mixpanel tracking token
- *   - Feature flags
- *   - Finance Type
  */
 
 export const DEALERS = {
-  // ─────────────────────────────────────────────────────────────
-  // FindnDrive (default / fallback)
-  // ─────────────────────────────────────────────────────────────
   'findndrive': {
     name: 'FindnDrive',
-    branchCode: 'SRT001EM',                    // ← Edith BranchCode
-    financeType: 'vehicle',
-    allowedDomains: [
-      'findndrive.co.za',
-      'seritifinancedev.findndrive.co.za',
-      'seritifinance.findndrive.co.za',
-      'www.findndrive.co.za',
-      'localhost',
-      'findanddrivesupport-e-fficient-ui.still-fire-1c3d.workers.dev',
-    ],
-    mixpanelToken: '',
-    theme: {
-      primary: '#6C3FC5',
-      primaryLight: '#8B5CF6',
-      primaryDark: '#4C1D95',
-      gradient: 'linear-gradient(135deg, #6C3FC5 0%, #C026D3 100%)',
-      fontFamily: "'Inter', sans-serif",
-      borderRadius: '12px',
-      logoUrl: '/logos/findndrive.svg',
-    },
-    features: {
-      showDeposit: true,
-      showCurrentFinance: true,
-      vehicleQueryParams: true,              // accepts ?make=&model=&mm= in embed URL
-    },
-  },
-
-  // ─────────────────────────────────────────────────────────────
-  // Car Dealer XYZ
-  // ─────────────────────────────────────────────────────────────
-  'dealer-xyz': {
-    name: 'Car Dealer XYZ',
-    branchCode: 'XYZ002',
-    financeType: 'vehicle',
-    allowedDomains: [
-      'dealerxyz.co.za',
-      'www.dealerxyz.co.za',
-    ],
-    mixpanelToken: '',
-    theme: {
-      primary: '#E63946',
-      primaryLight: '#FF6B6B',
-      primaryDark: '#9B0000',
-      gradient: 'linear-gradient(135deg, #E63946 0%, #FF6B6B 100%)',
-      fontFamily: "'Inter', sans-serif",
-      borderRadius: '8px',
-      logoUrl: '/logos/dealer-xyz.svg',
-    },
-    features: {
-      showDeposit: true,
-      showCurrentFinance: false,
-      vehicleQueryParams: true,
-    },
-  },
-
-  // ─────────────────────────────────────────────────────────────
-  // Find and Drive
-  // ─────────────────────────────────────────────────────────────
-  'find-and-drive': {
-    name: 'Find and Drive',
     branchCode: 'SRT001EM',
     financeType: 'vehicle',
     allowedDomains: [
       'findndrive.co.za',
+      'www.findndrive.co.za',
+      'seritifinancedev.findndrive.co.za',
       'seritifinance.findndrive.co.za',
+      'localhost',
+      'findanddrivesupport-e-fficient-ui.still-fire-1c3d.workers.dev',
     ],
-    mixpanelToken: '',
     theme: {
-      primary: '#6c3fc5',
-      gradient: 'linear-gradient(135deg, #6c3fc5 0%, #6c3fc5 100%)',
+      primary: '#6C3FC5',
+      gradient: 'linear-gradient(135deg, #6C3FC5 0%, #C026D3 100%)',
       fontFamily: "'Inter', sans-serif",
       borderRadius: '12px',
     },
-    features: {
-      showDeposit: true,
-      showCurrentFinance: true,
-      vehicleQueryParams: true,
-    },
+    features: { showDeposit: true, showCurrentFinance: true, vehicleQueryParams: true },
   },
-
-  // ─────────────────────────────────────────────────────────────
-  // ADD MORE DEALERS BELOW — copy a block, change the values
-  // ─────────────────────────────────────────────────────────────
-};
-
-
   'keitzman-finance': {
     name: 'Keitzman Finance',
     branchCode: 'KAEF001',
+    financeType: 'vehicle',
     allowedDomains: [
       'keitzmanfinance.co.za',
+      'keitzman-finance.seritifinance.findndrive.co.za',
       'seritifinance.findndrive.co.za',
     ],
-    mixpanelToken: '',
-    financeType: 'vehicle',
     theme: {
       primary: '#c0392b',
       gradient: 'linear-gradient(135deg, #c0392b 0%, #c0392b 100%)',
       fontFamily: "'Inter', sans-serif",
       borderRadius: '12px',
     },
-    features: {
-      showDeposit: true,
-      showCurrentFinance: true,
-      vehicleQueryParams: true,
-    },
+    features: { showDeposit: true, showCurrentFinance: true, vehicleQueryParams: true },
   },
-
   'yonda-bike': {
     name: 'Yonda Bike',
     branchCode: 'YOND001',
+    financeType: 'bike',
     allowedDomains: [
       'yonda.co.za',
-      'seritifinance.findndrive.co.za',
+      'yonda-bike.seritifinance.findndrive.co.za',
     ],
-    mixpanelToken: '',
-    financeType: 'bike',
     theme: {
       primary: '#0154fc',
       gradient: 'linear-gradient(135deg, #0154fc 0%, #0154fc 100%)',
       fontFamily: "'Inter', sans-serif",
       borderRadius: '12px',
     },
-    features: {
-      showDeposit: true,
-      showCurrentFinance: true,
-      vehicleQueryParams: true,
-    },
+    features: { showDeposit: true, showCurrentFinance: true, vehicleQueryParams: true },
   },
+  // ADD MORE DEALERS BELOW
+};
+
 // ── Lookup helpers ────────────────────────────────────────────
 
-/**
- * Get dealer config by branchCode query param or referring domain.
- * Priority: explicit ?dealer= param → referring domain match → null
- */
 export function getDealerConfig(dealerKey, referringDomain) {
-  // 1. Explicit key (from query param ?dealer=findndrive)
   if (dealerKey && DEALERS[dealerKey]) {
     return { key: dealerKey, ...DEALERS[dealerKey] };
   }
-
-  // 2. Match by referring domain
   if (referringDomain) {
     const hostname = referringDomain.replace(/^https?:\/\//, '').split('/')[0];
     for (const [key, config] of Object.entries(DEALERS)) {
@@ -171,20 +73,13 @@ export function getDealerConfig(dealerKey, referringDomain) {
       }
     }
   }
-
-  // 3. Fallback to first dealer (or null — your choice)
   const [firstKey, firstConfig] = Object.entries(DEALERS)[0];
   return { key: firstKey, ...firstConfig };
 }
 
-/**
- * Check whether a given origin is whitelisted for any dealer.
- * Used by the CORS / embed middleware.
- */
 export function isOriginAllowed(origin) {
   if (!origin) return false;
   const hostname = origin.replace(/^https?:\/\//, '').split('/')[0].split(':')[0];
-
   for (const config of Object.values(DEALERS)) {
     if (config.allowedDomains.includes(hostname)) return true;
     if (config.allowedDomains.some(d => hostname.endsWith(`.${d}`))) return true;
