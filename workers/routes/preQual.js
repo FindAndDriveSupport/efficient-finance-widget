@@ -41,6 +41,8 @@ export async function handlePreQual(request, ctx, jsonResponse) {
     mobileNumber: formatMobile(body.mobileNumber),
     hasDeposit: body.hasDeposit || false,
     hasExistingFinance: body.hasExistingFinance || false,
+    deposit: Number(body.depositAmount) || 0,
+    currentInstalment: Number(body.financeAmount) || 0,
     branchCode: dealerConfig.branchCode,
     ...(body.vehicleMake  ? { vehicleMake: body.vehicleMake }   : {}),
     ...(body.vehicleModel ? { vehicleModel: body.vehicleModel } : {}),
