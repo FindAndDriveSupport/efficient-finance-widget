@@ -10,13 +10,14 @@
  *   - Edith branch code
  *   - Whitelisted embed domains
  *   - UI theme (colours, logo)
+ *   - Mixpanel tracking token
  *   - Feature flags
  *   - Finance Type
  */
 
 export const DEALERS = {
   // ─────────────────────────────────────────────────────────────
-  // EXAMPLE DEALER 1 — FindnDrive (default / fallback)
+  // FindnDrive (default / fallback)
   // ─────────────────────────────────────────────────────────────
   'findndrive': {
     name: 'FindnDrive',
@@ -30,6 +31,7 @@ export const DEALERS = {
       'localhost',
       'findanddrivesupport-e-fficient-ui.still-fire-1c3d.workers.dev',
     ],
+    mixpanelToken: '',
     theme: {
       primary: '#6C3FC5',
       primaryLight: '#8B5CF6',
@@ -47,7 +49,7 @@ export const DEALERS = {
   },
 
   // ─────────────────────────────────────────────────────────────
-  // EXAMPLE DEALER 2 — Car Dealer XYZ
+  // Car Dealer XYZ
   // ─────────────────────────────────────────────────────────────
   'dealer-xyz': {
     name: 'Car Dealer XYZ',
@@ -57,6 +59,7 @@ export const DEALERS = {
       'dealerxyz.co.za',
       'www.dealerxyz.co.za',
     ],
+    mixpanelToken: '',
     theme: {
       primary: '#E63946',
       primaryLight: '#FF6B6B',
@@ -74,10 +77,79 @@ export const DEALERS = {
   },
 
   // ─────────────────────────────────────────────────────────────
+  // Find and Drive
+  // ─────────────────────────────────────────────────────────────
+  'find-and-drive': {
+    name: 'Find and Drive',
+    branchCode: 'SRT001EM',
+    financeType: 'vehicle',
+    allowedDomains: [
+      'findndrive.co.za',
+      'seritifinance.findndrive.co.za',
+    ],
+    mixpanelToken: '',
+    theme: {
+      primary: '#6c3fc5',
+      gradient: 'linear-gradient(135deg, #6c3fc5 0%, #6c3fc5 100%)',
+      fontFamily: "'Inter', sans-serif",
+      borderRadius: '12px',
+    },
+    features: {
+      showDeposit: true,
+      showCurrentFinance: true,
+      vehicleQueryParams: true,
+    },
+  },
+
+  // ─────────────────────────────────────────────────────────────
   // ADD MORE DEALERS BELOW — copy a block, change the values
   // ─────────────────────────────────────────────────────────────
 };
 
+
+  'keitzman-finance': {
+    name: 'Keitzman Finance',
+    branchCode: 'KAEF001',
+    allowedDomains: [
+      'keitzmanfinance.co.za',
+      'seritifinance.findndrive.co.za',
+    ],
+    mixpanelToken: '',
+    financeType: 'vehicle',
+    theme: {
+      primary: '#c0392b',
+      gradient: 'linear-gradient(135deg, #c0392b 0%, #c0392b 100%)',
+      fontFamily: "'Inter', sans-serif",
+      borderRadius: '12px',
+    },
+    features: {
+      showDeposit: true,
+      showCurrentFinance: true,
+      vehicleQueryParams: true,
+    },
+  },
+
+  'yonda-bike': {
+    name: 'Yonda Bike',
+    branchCode: 'YOND001',
+    allowedDomains: [
+      'yonda.co.za',
+      'seritifinance.findndrive.co.za',
+    ],
+    mixpanelToken: '',
+    financeType: 'bike',
+    theme: {
+      primary: '#0154fc',
+      gradient: 'linear-gradient(135deg, #0154fc 0%, #0154fc 100%)',
+      fontFamily: "'Inter', sans-serif",
+      borderRadius: '12px',
+    },
+    features: {
+      showDeposit: true,
+      showCurrentFinance: true,
+      vehicleQueryParams: true,
+    },
+  },
 // ── Lookup helpers ────────────────────────────────────────────
 
 /**
