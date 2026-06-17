@@ -12,6 +12,7 @@
  *   - UI theme (colours, logo)
  *   - Feature flags
  *   - Finance type
+ *   - Edith environment (dev | prod)
  */
 
 export const DEALERS = {
@@ -22,6 +23,7 @@ export const DEALERS = {
     name: 'FindnDrive',
     branchCode: 'SRT001EM',
     financeType: 'vehicle',
+    edithEnv: 'dev',
     allowedDomains: [
       'findndrive.co.za',
       'www.findndrive.co.za',
@@ -53,6 +55,7 @@ export const DEALERS = {
     name: 'Keitzman Finance',
     branchCode: 'KAEF001',
     financeType: 'vehicle',
+    edithEnv: 'prod',
     allowedDomains: [
       'keitzmanfinance.co.za',
       'keitzman-finance.seritifinance.findndrive.co.za',
@@ -78,6 +81,7 @@ export const DEALERS = {
     name: 'Yonda Bike',
     branchCode: 'YOND001',
     financeType: 'bike',
+    edithEnv: 'prod',
     allowedDomains: [
       'yonda.co.za',
       'yonda-bike.seritifinance.findndrive.co.za',
