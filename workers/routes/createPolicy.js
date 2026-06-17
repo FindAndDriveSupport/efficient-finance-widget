@@ -28,6 +28,7 @@ export async function handleCreatePolicy(request, ctx, jsonResponse) {
   const isProd = dealerConfig.edithEnv === 'prod';
   const companyCode = isProd ? env.EDITH_COMPANY_CODE_PROD : env.EDITH_COMPANY_CODE;
   const companyPass = isProd ? env.EDITH_COMPANY_PASS_PROD : env.EDITH_COMPANY_PASS;
+  const wsdlUrl = isProd ? env.EDITH_WSDL_URL_PROD : env.EDITH_WSDL_URL;
 
   // Build Edith XML payload
   const salesRef = generateSalesRef(dealerConfig.branchCode);
