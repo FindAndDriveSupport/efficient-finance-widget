@@ -22,8 +22,6 @@
  * }
  */
 
-const EDITH_WSDL_DEFAULT = 'https://www.seritisolutions.co.za/demows/PolicyServicesV300.asmx';
-
 const ALLOWED_EXTENSIONS = new Set([
   'bmp','doc','docx','gif','jpeg','jpg','pdf','png','rtf','tif','tiff','txt','xls','xlsx','zip',
 ]);
@@ -76,13 +74,21 @@ export async function handleSubmitDocuments(request, ctx, jsonResponse) {
     }
   }
 
-  const xml = buildSubmitDocumentsXML(documents, env, policyNumber, dealerConfig?.branchCode, salesRef);
+  // Select Edith credentials and WSDL URL based on dealer's edithEnv
+  const isProd = dealerConfig?.edithEnv === 'prod';
+  const companyCode = isProd ? env.EDITH_COMPANY_CODE_PROD : env.EDITH_COMPANY_CODE;
+  const companyPass = isProd ? env.EDITH_COMPANY_PASS_PROD : env.EDITH_COMPANY_PASS;
+  const wsdlUrl = isProd ? env.EDITH_WSDL_URL_PROD : env.EDITH_WSDL_URL;
+  console.error('SUBMIT_DOCS_WSDL_URL: ' + wsdlUrl + ' | isProd: ' + isProd);
+
+  const xml = buildSubmitDocumentsXML(documents, companyCode, companyPass, policyNumber, dealerConfig?.branchCode, salesRef);
 
   console.log(JSON.stringify({
     level: 'info',
     type: 'edith_submit_documents_request',
     policyNumber,
     dealerKey: dealerConfig?.key,
+    edithEnv: dealerConfig?.edithEnv || 'dev',
     documentCount: documents.length,
     categories: documents.map(d => d.category),
     ts: new Date().toISOString(),
@@ -90,7 +96,7 @@ export async function handleSubmitDocuments(request, ctx, jsonResponse) {
 
   let edithText;
   try {
-    const res = await fetch(EDITH_WSDL_DEFAULT, {
+    const res = await fetch(wsdlUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'text/xml; charset=utf-8',
@@ -135,7 +141,7 @@ export async function handleSubmitDocuments(request, ctx, jsonResponse) {
 
 // ── Edith XML Builder ────────────────────────────────────────────────────
 
-function buildSubmitDocumentsXML(documents, env, policyNumber, branchCode, salesRef) {
+function buildSubmitDocumentsXML(documents, companyCode, companyPass, policyNumber, branchCode, salesRef) {
   const docsXml = documents.map((doc) => {
     const guid = crypto.randomUUID();
     const ext = (doc.fileExtension || '').toLowerCase().replace(/^\./, '');
@@ -156,8 +162,8 @@ function buildSubmitDocumentsXML(documents, env, policyNumber, branchCode, sales
   <soap:Body>
     <tem:SubmitDocuments>
       <tem:Credentials>
-        <tem:CompanyCode>${env.EDITH_COMPANY_CODE}</tem:CompanyCode>
-        <tem:CompanyPassword>${env.EDITH_COMPANY_PASS}</tem:CompanyPassword>
+        <tem:CompanyCode>${companyCode}</tem:CompanyCode>
+        <tem:CompanyPassword>${companyPass}</tem:CompanyPassword>
       </tem:Credentials>
       ${salesRef ? `<tem:SalesReferenceNumber>${esc(salesRef)}</tem:SalesReferenceNumber>` : ''}
       ${branchCode ? `<tem:BranchCode>${esc(branchCode)}</tem:BranchCode>` : ''}
