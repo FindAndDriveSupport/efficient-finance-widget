@@ -22,10 +22,12 @@ export async function handleCreatePolicy(request, ctx, jsonResponse) {
   try { body = await request.json(); }
   catch { return jsonResponse({ error: 'Invalid JSON body' }, 400, origin, env); }
 
-  // Select Edith credentials based on dealer's edithEnv
+  // Select Edith credentials and WSDL URL based on dealer's edithEnv
   const isProd = dealerConfig.edithEnv === 'prod';
   const companyCode = isProd ? env.EDITH_COMPANY_CODE_PROD : env.EDITH_COMPANY_CODE;
   const companyPass = isProd ? env.EDITH_COMPANY_PASS_PROD : env.EDITH_COMPANY_PASS;
+  const wsdlUrl = isProd ? env.EDITH_WSDL_URL_PROD : env.EDITH_WSDL_URL;
+  console.error('EDITH_WSDL_URL: ' + wsdlUrl + ' | isProd: ' + isProd);
 
   // Build Edith XML payload
   const salesRef = generateSalesRef(dealerConfig.branchCode);
