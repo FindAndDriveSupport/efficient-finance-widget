@@ -136,7 +136,7 @@ function buildEdithXML(data, companyCode, companyPass, dealer, salesRef) {
             ${d.bankAccountNumber ? `<tem:AccountNumber>${esc(d.bankAccountNumber)}</tem:AccountNumber>` : ''}
             ${d.accountType      ? `<tem:AccountType>${esc(d.accountType.toUpperCase())}</tem:AccountType>` : ''}
             <tem:BankBranchCode>${esc(d.bankBranchCode)}</tem:BankBranchCode>
-            <tem:PrimaryAccountInd>true</tem:PrimaryAccountInd>
+            <tem:PrimaryAccountInd>1</tem:PrimaryAccountInd>
           </tem:BankAccount>
         </tem:BankAccounts>` : '';
 
@@ -213,12 +213,12 @@ function buildEdithXML(data, companyCode, companyPass, dealer, salesRef) {
             <tem:PaymentMethod>DEBIT ORDER</tem:PaymentMethod>
           </tem:FinanceApplication>
           <tem:Consents>
-            <tem:DataAttestationInd>${d.dataAttestation ? 'true' : 'false'}</tem:DataAttestationInd>
-            <tem:TelesalesMarketingConsentInd>${d.marketingConsent ? 'true' : 'false'}</tem:TelesalesMarketingConsentInd>
-            <tem:EmailMarketingConsentInd>${d.marketingConsent ? 'true' : 'false'}</tem:EmailMarketingConsentInd>
-            <tem:SMSMarketingConsentInd>${d.marketingConsent ? 'true' : 'false'}</tem:SMSMarketingConsentInd>
-            <tem:IdxConsentInd>${d.financialAccessConsent ? 'true' : 'false'}</tem:IdxConsentInd>
-            <tem:IvxConsentInd>${d.financialAccessConsent ? 'true' : 'false'}</tem:IvxConsentInd>
+            <tem:DataAttestationInd>${d.dataAttestation ? '1' : '0'}</tem:DataAttestationInd>
+            <tem:TelesalesMarketingConsentInd>${d.marketingConsent ? '1' : '0'}</tem:TelesalesMarketingConsentInd>
+            <tem:EmailMarketingConsentInd>${d.marketingConsent ? '1' : '0'}</tem:EmailMarketingConsentInd>
+            <tem:SMSMarketingConsentInd>${d.marketingConsent ? '1' : '0'}</tem:SMSMarketingConsentInd>
+            <tem:IdxConsentInd>${d.financialAccessConsent ? '1' : '0'}</tem:IdxConsentInd>
+            <tem:IvxConsentInd>${d.financialAccessConsent ? '1' : '0'}</tem:IvxConsentInd>
           </tem:Consents>
         </tem:Client>
       </tem:Policy>${productsXml}
