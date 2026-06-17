@@ -4,6 +4,8 @@ main        = "workers/worker.js"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 
+tail_consumers = [{ service = "alert-worker" }]
+
 [[kv_namespaces]]
 binding  = "SERITI_CACHE"
 id       = "16c7bf807bc0445ab0420a16f2352c0d"
