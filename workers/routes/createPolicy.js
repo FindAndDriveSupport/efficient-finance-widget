@@ -24,10 +24,15 @@ export async function handleCreatePolicy(request, ctx, jsonResponse) {
   try { body = await request.json(); }
   catch { return jsonResponse({ error: 'Invalid JSON body' }, 400, origin, env); }
 
+  // Select Edith credentials based on dealer's edithEnv
+  const isProd = dealerConfig.edithEnv === 'prod';
+  const companyCode = isProd ? env.EDITH_COMPANY_CODE_PROD : env.EDITH_COMPANY_CODE;
+  const companyPass = isProd ? env.EDITH_COMPANY_PASS_PROD : env.EDITH_COMPANY_PASS;
+
   // Build Edith XML payload
   const salesRef = generateSalesRef(dealerConfig.branchCode);
   console.error("EDITH_PAYLOAD: " + JSON.stringify(body));
-  const xml = buildEdithXML(body, env, dealerConfig, salesRef);
+  const xml = buildEdithXML(body, companyCode, companyPass, dealerConfig, salesRef);
   console.error("EDITH_XML: " + xml);
 
   console.log(JSON.stringify({
@@ -36,8 +41,7 @@ export async function handleCreatePolicy(request, ctx, jsonResponse) {
     salesRef,
     dealerKey: dealerConfig.key,
     branchCode: dealerConfig.branchCode,
-    payload: body,
-    xml,
+    edithEnv: dealerConfig.edithEnv || 'dev',
     ts: new Date().toISOString(),
   }));
 
@@ -120,10 +124,8 @@ export async function handleCreatePolicy(request, ctx, jsonResponse) {
 }
 
 // ── Edith XML Builder ─────────────────────────────────────────
-// Maps app form fields → Edith CreatePolicy SOAP request
-// Reference: edith-createpolicy-data-mapping.html
 
-function buildEdithXML(data, env, dealer, salesRef) {
+function buildEdithXML(data, companyCode, companyPass, dealer, salesRef) {
   const d = data;
   const isBike = dealer.financeType === 'bike';
 
@@ -153,8 +155,8 @@ function buildEdithXML(data, env, dealer, salesRef) {
   <soap:Body>
     <tem:CreatePolicy>
       <tem:Credentials>
-        <tem:CompanyCode>${env.EDITH_COMPANY_CODE}</tem:CompanyCode>
-        <tem:CompanyPassword>${env.EDITH_COMPANY_PASS}</tem:CompanyPassword>
+        <tem:CompanyCode>${companyCode}</tem:CompanyCode>
+        <tem:CompanyPassword>${companyPass}</tem:CompanyPassword>
       </tem:Credentials>
       <tem:Policy>
         <tem:BranchCode>${dealer.branchCode}</tem:BranchCode>
@@ -205,7 +207,7 @@ function buildEdithXML(data, env, dealer, salesRef) {
           ${d.bureauExpenses ? `<tem:LoanRepayments>${Number(d.bureauExpenses).toFixed(2)}</tem:LoanRepayments>` : ''}
           <tem:FundsSource>SALARY</tem:FundsSource>
           <tem:FinanceApplication>
-            <tem:CompanyCode>${env.EDITH_COMPANY_CODE}</tem:CompanyCode>
+            <tem:CompanyCode>${companyCode}</tem:CompanyCode>
             ${d.depositAmount ? `<tem:DepositValue>${Number(d.depositAmount).toFixed(2)}</tem:DepositValue>` : ''}
             <tem:AgreementType>INSTALMENT SALE</tem:AgreementType>
             <tem:PaymentMethod>DEBIT ORDER</tem:PaymentMethod>
@@ -236,7 +238,6 @@ function generateSalesRef(branchCode) {
 }
 
 function parseEdithXMLResponse(xml) {
-  // Basic XML parsing — extract key elements
   const getTag = (tag) => {
     const match = xml.match(new RegExp(`<[^>]*${tag}[^>]*>([^<]*)<`, 'i'));
     return match ? match[1].trim() : null;
@@ -245,7 +246,6 @@ function parseEdithXMLResponse(xml) {
   const policyNumber = getTag('PolicyNumber');
   const errors = [];
 
-  // Extract field errors from SOAP response
   const errorMatches = xml.matchAll(/<Error[^>]*>([\s\S]*?)<\/Error>/gi);
   for (const m of errorMatches) {
     const fieldMatch = m[1].match(/<FieldName[^>]*>([^<]*)<\/FieldName>/i);
