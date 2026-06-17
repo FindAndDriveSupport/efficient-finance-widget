@@ -9,8 +9,6 @@
 
 import { STATUS_CODES, SYSTEM_MESSAGES, FIELD_ERRORS, parseEdithErrors } from '../utils/edithErrors.js';
 
-const EDITH_WSDL_DEFAULT = 'https://www.seritisolutions.co.za/demows/PolicyServicesV300.asmx';
-
 // YONDA Service Fee — defaults applied for financeType === 'bike'
 const YONDA_SERVICE_FEE = {
   productOptionId: '9845',
@@ -28,7 +26,6 @@ export async function handleCreatePolicy(request, ctx, jsonResponse) {
   const isProd = dealerConfig.edithEnv === 'prod';
   const companyCode = isProd ? env.EDITH_COMPANY_CODE_PROD : env.EDITH_COMPANY_CODE;
   const companyPass = isProd ? env.EDITH_COMPANY_PASS_PROD : env.EDITH_COMPANY_PASS;
-  const wsdlUrl = isProd ? env.EDITH_WSDL_URL_PROD : env.EDITH_WSDL_URL;
 
   // Build Edith XML payload
   const salesRef = generateSalesRef(dealerConfig.branchCode);
@@ -48,7 +45,7 @@ export async function handleCreatePolicy(request, ctx, jsonResponse) {
 
   let edithResponse;
   try {
-    const res = await fetch(EDITH_WSDL_DEFAULT, {
+    const res = await fetch(wsdlUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'text/xml; charset=utf-8',
