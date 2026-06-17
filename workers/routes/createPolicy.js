@@ -135,8 +135,9 @@ function buildEdithXML(data, companyCode, companyPass, dealer, salesRef) {
           <tem:BankAccount>
             ${d.bankAccountNumber ? `<tem:AccountNumber>${esc(d.bankAccountNumber)}</tem:AccountNumber>` : ''}
             ${d.accountType      ? `<tem:AccountType>${esc(d.accountType.toUpperCase())}</tem:AccountType>` : ''}
+            <tem:AccountHolderName>${esc((d.firstName || "") + " " + (d.lastName || ""))}</tem:AccountHolderName>
             <tem:BankBranchCode>${esc(d.bankBranchCode)}</tem:BankBranchCode>
-            <tem:PrimaryAccountInd>1</tem:PrimaryAccountInd>
+            <tem:PrimaryAccountInd>-1</tem:PrimaryAccountInd>
           </tem:BankAccount>
         </tem:BankAccounts>` : '';
 
