@@ -8,7 +8,7 @@
  *   dealerKey  — required, e.g. yonda-bike
  *   since      — optional ISO datetime, e.g. 2026-06-18T00:00:00Z
  *   until      — optional ISO datetime, defaults to now
- *   limit      — optional, max 100, default 50
+ *   limit      — optional, max 10,000, default 50
  */
 
 export async function handleGetPolicies(request, ctx, jsonResponse) {
@@ -18,7 +18,7 @@ export async function handleGetPolicies(request, ctx, jsonResponse) {
   const dealerKey = url.searchParams.get('dealerKey');
   const since = url.searchParams.get('since');
   const until = url.searchParams.get('until');
-  const limit = Math.min(parseInt(url.searchParams.get('limit') || '50'), 100);
+  const limit = Math.min(parseInt(url.searchParams.get('limit') || '50'), 10000);
 
   if (!dealerKey) {
     return jsonResponse({ error: 'Missing required param: dealerKey' }, 400, origin, env);
