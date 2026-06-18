@@ -212,7 +212,6 @@ function buildEdithXML(data, companyCode, companyPass, dealer, salesRef) {
           ${d.residentialStatus    ? `<tem:ResidentialStatus>${esc(d.residentialStatus)}</tem:ResidentialStatus>` : ''}
           ${d.physicalAddressDate  ? `<tem:PhysicalAddressDate>${esc(d.physicalAddressDate)}</tem:PhysicalAddressDate>` : ''}` : ''}
           ${d.nextOfKinFirstName ? `
-          ${d.nextOfKinFirstName ? `
           <tem:Relative>
             <tem:RelativeRelation>DISTANT</tem:RelativeRelation>
             ${d.nextOfKinFirstName ? `<tem:FirstName>${esc(d.nextOfKinFirstName)}</tem:FirstName>` : ''}
