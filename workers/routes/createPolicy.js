@@ -16,7 +16,7 @@ const YONDA_SERVICE_FEE = {
 };
 
 export async function handleCreatePolicy(request, ctx, jsonResponse) {
-  const { env, dealerConfig, origin } = ctx;
+  const { env, dealerConfig, origin, ctx: workerCtx } = ctx;
 
   let body;
   try { body = await request.json(); }
@@ -114,10 +114,32 @@ export async function handleCreatePolicy(request, ctx, jsonResponse) {
     }, 200, origin, env);
   }
 
-  // Clean success
+  // Clean success — store policy event in D1 and return
+  const policyNumber = edithResponse.policyNumber;
+
+  // Write to D1 in background (non-blocking)
+  if (env.DB && policyNumber && workerCtx) {
+    workerCtx.waitUntil(
+      env.DB.prepare(`
+        INSERT INTO policy_events (dealer_key, policy_number, applicant_id, sales_ref, branch_code, finance_type)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `)
+      .bind(
+        dealerConfig.key,
+        policyNumber,
+        body.applicantId || null,
+        salesRef,
+        dealerConfig.branchCode,
+        dealerConfig.financeType || 'vehicle',
+      )
+      .run()
+      .catch(err => console.error('D1 write failed:', err.message))
+    );
+  }
+
   return jsonResponse({
     success: true,
-    policyNumber: edithResponse.policyNumber,
+    policyNumber,
     salesRef,
     code: 100,
   }, 200, origin, env);
