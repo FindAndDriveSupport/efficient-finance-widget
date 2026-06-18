@@ -192,6 +192,13 @@ function buildEdithXML(data, companyCode, companyPass, dealer, salesRef) {
         ${(d.vehicleMake || d.vehicleModel) ? `<tem:VehicleDescription>${esc([d.vehicleMake, d.vehicleModel].filter(Boolean).join(' '))}</tem:VehicleDescription>` : ''}
         ${d.estimatedApprovalAmount ? `<tem:RetailPrice>${d.estimatedApprovalAmount}</tem:RetailPrice>` : ''}
         <tem:NewUsed>USED</tem:NewUsed>
+        ${d.nextOfKinFirstName ? `
+        <tem:RelativeRelation>DISTANT</tem:RelativeRelation>
+        <tem:Relative>
+          ${d.nextOfKinFirstName ? `<tem:FirstName>${esc(d.nextOfKinFirstName)}</tem:FirstName>` : ''}
+          ${d.nextOfKinLastName  ? `<tem:LastName>${esc(d.nextOfKinLastName)}</tem:LastName>` : ''}
+          ${d.nextOfKinMobile    ? `<tem:MobileNumber>${esc(d.nextOfKinMobile)}</tem:MobileNumber>` : ''}
+        </tem:Relative>` : ''}
        <tem:Client>
           ${d.title         ? `<tem:Title>${esc(d.title.toUpperCase())}</tem:Title>` : ''}
           ${d.firstName     ? `<tem:FirstName>${esc(d.firstName)}</tem:FirstName>` : ''}
@@ -211,13 +218,6 @@ function buildEdithXML(data, companyCode, companyPass, dealer, salesRef) {
           </tem:PhysicalAddress>
           ${d.residentialStatus    ? `<tem:ResidentialStatus>${esc(d.residentialStatus)}</tem:ResidentialStatus>` : ''}
           ${d.physicalAddressDate  ? `<tem:PhysicalAddressDate>${esc(d.physicalAddressDate)}</tem:PhysicalAddressDate>` : ''}` : ''}
-          ${d.nextOfKinFirstName ? `
-          <tem:Relative>
-            <tem:RelativeRelation>DISTANT</tem:RelativeRelation>
-            ${d.nextOfKinFirstName ? `<tem:FirstName>${esc(d.nextOfKinFirstName)}</tem:FirstName>` : ''}
-            ${d.nextOfKinLastName  ? `<tem:LastName>${esc(d.nextOfKinLastName)}</tem:LastName>` : ''}
-            ${d.nextOfKinMobile    ? `<tem:CellNumber>${esc(d.nextOfKinMobile)}</tem:CellNumber>` : ''}
-          </tem:Relative>` : ''}
           ${d.employmentType ? `<tem:EmploymentType>${esc(d.employmentType)}</tem:EmploymentType>` : ''}
           ${d.employerName   ? `<tem:EmployerName>${esc(d.employerName)}</tem:EmployerName>` : ''}
           ${d.occupation     ? `<tem:Occupation>${esc(d.occupation)}</tem:Occupation>` : ''}
