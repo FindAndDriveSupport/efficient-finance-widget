@@ -12,15 +12,16 @@
  */
 
 import { isOriginAllowed, getDealerConfig } from './dealers/dealers.config.js';
-import { handlePreQual }       from './routes/preQual.js';
-import { handlePrediction }    from './routes/prediction.js';
-import { handleGetApplicant }  from './routes/getApplicant.js';
-import { handleCreatePolicy }  from './routes/createPolicy.js';
-import { handleSubmitDocuments }  from './routes/submitDocuments.js';
-import { handleDealerConfig }  from './routes/dealerConfig.js';
-import { handleAddressSearch } from './routes/addressSearch.js';
+import { handlePreQual }         from './routes/preQual.js';
+import { handlePrediction }      from './routes/prediction.js';
+import { handleGetApplicant }    from './routes/getApplicant.js';
+import { handleCreatePolicy }    from './routes/createPolicy.js';
+import { handleSubmitDocuments } from './routes/submitDocuments.js';
+import { handleDealerConfig }    from './routes/dealerConfig.js';
+import { handleAddressSearch }   from './routes/addressSearch.js';
+import { handleGetPolicies }     from './routes/getPolicies.js';
+import { handleLookups }         from './routes/lookups.js';
 
-import { handleLookups } from './routes/lookups.js';
 // ── CORS headers ──────────────────────────────────────────────
 
 function corsHeaders(origin, env) {
@@ -28,7 +29,7 @@ function corsHeaders(origin, env) {
   return {
     'Access-Control-Allow-Origin': allowed ? origin : 'null',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Dealer-Key',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Dealer-Key, X-Api-Key',
     'Access-Control-Max-Age': '86400',
   };
 }
@@ -66,7 +67,7 @@ export default {
     const dealerConfig = getDealerConfig(dealerKey, origin);
 
     // Inject env + dealerConfig into a context object
-    const ctx2 = { env, dealerConfig, origin };
+    const ctx2 = { env, dealerConfig, origin, ctx };
 
     try {
       const path = url.pathname;
@@ -86,13 +87,15 @@ export default {
         return handlePrediction(request, ctx2, jsonResponse);
       }
 
-      // ── Seriti: Get Applicant (consent → Step 3 prefill) ──
+      // ── Address search & lookups ──
       if (path === '/api/address-search' && method === 'GET') {
         return handleAddressSearch(request, ctx2, jsonResponse);
       }
       if (path.startsWith('/api/lookup/') && method === 'GET') {
         return handleLookups(request, ctx2, jsonResponse);
       }
+
+      // ── Seriti: Get Applicant (consent → Step 3 prefill) ──
       if (path === '/api/financing/applicant' && method === 'GET') {
         return handleGetApplicant(request, ctx2, jsonResponse);
       }
@@ -105,6 +108,11 @@ export default {
       // ── Edith: Submit Documents (Fast Application) ──
       if (path === '/api/policy/documents' && method === 'POST') {
         return handleSubmitDocuments(request, ctx2, jsonResponse);
+      }
+
+      // ── Policies: GET endpoint for dealer CRM integration ──
+      if (path === '/api/policies' && method === 'GET') {
+        return handleGetPolicies(request, ctx2, jsonResponse);
       }
 
       return jsonResponse({ error: 'Not found' }, 404, origin, env);
