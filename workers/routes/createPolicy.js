@@ -212,11 +212,12 @@ function buildEdithXML(data, companyCode, companyPass, dealer, salesRef) {
           ${d.residentialStatus    ? `<tem:ResidentialStatus>${esc(d.residentialStatus)}</tem:ResidentialStatus>` : ''}
           ${d.physicalAddressDate  ? `<tem:PhysicalAddressDate>${esc(d.physicalAddressDate)}</tem:PhysicalAddressDate>` : ''}` : ''}
           ${d.nextOfKinFirstName ? `
-          <tem:RelativeRelation>DISTANT</tem:RelativeRelation>
+          ${d.nextOfKinFirstName ? `
           <tem:Relative>
-            <tem:FirstName>${esc(d.nextOfKinFirstName)}</tem:FirstName>
-            <tem:LastName>${esc(d.nextOfKinLastName || '')}</tem:LastName>
-            <tem:CellNumber>${d.nextOfKinMobile || ''}</tem:CellNumber>
+            <tem:RelativeRelation>DISTANT</tem:RelativeRelation>
+            ${d.nextOfKinFirstName ? `<tem:FirstName>${esc(d.nextOfKinFirstName)}</tem:FirstName>` : ''}
+            ${d.nextOfKinLastName  ? `<tem:LastName>${esc(d.nextOfKinLastName)}</tem:LastName>` : ''}
+            ${d.nextOfKinMobile    ? `<tem:CellNumber>${esc(d.nextOfKinMobile)}</tem:CellNumber>` : ''}
           </tem:Relative>` : ''}
           ${d.employmentType ? `<tem:EmploymentType>${esc(d.employmentType)}</tem:EmploymentType>` : ''}
           ${d.employerName   ? `<tem:EmployerName>${esc(d.employerName)}</tem:EmployerName>` : ''}
