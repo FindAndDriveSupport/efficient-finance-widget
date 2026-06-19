@@ -69,6 +69,9 @@ export default {
     // Inject env + dealerConfig into a context object
     const ctx2 = { env, dealerConfig, origin, ctx };
 
+    // ── TEST ALERT — remove after confirming email delivery ──
+    console.error('[Worker] test alert — remove this line after confirming alert-worker email delivery');
+
     try {
       const path = url.pathname;
 
