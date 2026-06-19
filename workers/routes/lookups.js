@@ -21,17 +21,18 @@ export async function handleLookups(request, ctx, jsonResponse) {
     let results;
     if (query.length < 1) {
       const { results: rows } = await env.DB.prepare(
-        `SELECT ${selectCols} FROM ${table} ORDER BY name ASC LIMIT 100`
+        `SELECT ${selectCols} FROM ${table} ORDER BY name ASC LIMIT 1000`
       ).all();
       results = rows;
     } else {
       const { results: rows } = await env.DB.prepare(
-        `SELECT ${selectCols} FROM ${table} WHERE name LIKE ?1 ORDER BY name ASC LIMIT 50`
+        `SELECT ${selectCols} FROM ${table} WHERE name LIKE ?1 ORDER BY name ASC LIMIT 1000`
       ).bind(`%${query}%`).all();
       results = rows;
     }
     return jsonResponse({ results }, 200, origin, env);
   } catch (err) {
+    console.error('Lookup error:', err.message, err.stack);
     return jsonResponse({ error: 'Lookup failed', details: err.message }, 500, origin, env);
   }
 }
