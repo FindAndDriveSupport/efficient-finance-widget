@@ -27,13 +27,10 @@ export async function handleCreatePolicy(request, ctx, jsonResponse) {
   const companyCode = isProd ? env.EDITH_COMPANY_CODE_PROD : env.EDITH_COMPANY_CODE;
   const companyPass = isProd ? env.EDITH_COMPANY_PASS_PROD : env.EDITH_COMPANY_PASS;
   const wsdlUrl = isProd ? env.EDITH_WSDL_URL_PROD : env.EDITH_WSDL_URL;
-  console.error('EDITH_WSDL_URL: ' + wsdlUrl + ' | isProd: ' + isProd);
 
   // Build Edith XML payload
   const salesRef = generateSalesRef(dealerConfig.branchCode);
-  console.error("EDITH_PAYLOAD: " + JSON.stringify(body));
   const xml = buildEdithXML(body, companyCode, companyPass, dealerConfig, salesRef);
-  console.error("EDITH_XML: " + xml);
 
   console.log(JSON.stringify({
     level: 'info',
@@ -64,9 +61,7 @@ export async function handleCreatePolicy(request, ctx, jsonResponse) {
       body: text,
       ts: new Date().toISOString(),
     }));
-    console.error("EDITH_RAW_RESPONSE: " + text);
     edithResponse = parseEdithXMLResponse(text);
-    console.error("EDITH_PARSED: " + JSON.stringify(edithResponse));
   } catch (err) {
     logError('edith_network_error', err, env, { salesRef, dealerKey: dealerConfig.key });
     return jsonResponse({
@@ -184,14 +179,20 @@ function buildEdithXML(data, companyCode, companyPass, dealer, salesRef) {
       <tem:Policy>
         <tem:BranchCode>${dealer.branchCode}</tem:BranchCode>
         <tem:SalesReferenceNumber>${salesRef}</tem:SalesReferenceNumber>
-        <tem:TransactionType>${isBike ? 'MOTORBIKE SALE' : 'VEHICLE SALE'}</tem:TransactionType>
+        <tem:TransactionType>VEHICLE SALE</tem:TransactionType>
         <tem:Category>PRIVATE</tem:Category>${bankAccountsXml}
         ${d.vehicleMake    ? `<tem:Manufacturer>${esc(d.vehicleMake)}</tem:Manufacturer>` : ''}
         ${d.vehicleModel   ? `<tem:Model>${esc(d.vehicleModel)}</tem:Model>` : ''}
         ${d.vehicleMm      ? `<tem:VehicleCode>${esc(d.vehicleMm)}</tem:VehicleCode>` : ''}
         ${(d.vehicleMake || d.vehicleModel) ? `<tem:VehicleDescription>${esc([d.vehicleMake, d.vehicleModel].filter(Boolean).join(' '))}</tem:VehicleDescription>` : ''}
-        ${d.estimatedApprovalAmount ? `<tem:RetailPrice>${d.estimatedApprovalAmount}</tem:RetailPrice>` : ''}
+        ${d.estimatedApprovalAmount ? `<tem:RetailPrice>${d.estimatedApprovalAmount}</tem:RetailPrice>` : d.preQualTotal ? `<tem:RetailPrice>${d.preQualTotal}</tem:RetailPrice>` : ''}
         <tem:NewUsed>USED</tem:NewUsed>
+        ${d.spouseFirstName && d.maritalStatus?.toUpperCase() === 'MARRIED' ? `
+        <tem:Spouse>
+          ${d.spouseFirstName ? `<tem:FirstName>${esc(d.spouseFirstName)}</tem:FirstName>` : ''}
+          ${d.spouseLastName  ? `<tem:LastName>${esc(d.spouseLastName)}</tem:LastName>` : ''}
+          ${d.spouseIdNumber  ? `<tem:IDNumber>${esc(d.spouseIdNumber)}</tem:IDNumber>` : ''}
+        </tem:Spouse>` : ''}
         ${d.nextOfKinFirstName ? `
         <tem:RelativeRelation>DISTANT</tem:RelativeRelation>
         <tem:Relative>
@@ -206,7 +207,8 @@ function buildEdithXML(data, companyCode, companyPass, dealer, salesRef) {
           ${d.mobileNumber  ? `<tem:MobileNumber>${d.mobileNumber}</tem:MobileNumber>` : ''}
           ${d.emailAddress  ? `<tem:EmailAddress>${esc(d.emailAddress)}</tem:EmailAddress>` : ''}
           ${d.idNumber      ? `<tem:IDType>${esc(d.idType || 'RSA ID')}</tem:IDType><tem:IDNumber>${d.idNumber}</tem:IDNumber>` : '<tem:IDType>FOREIGN NATIONAL</tem:IDType>'}
-          ${d.gender ? `<tem:Gender>${esc(d.gender.toUpperCase())}</tem:Gender>` : ''}
+          ${d.gender        ? `<tem:Gender>${esc(d.gender.toUpperCase())}</tem:Gender>` : ''}
+          ${d.educationLevel ? `<tem:EducationLevel>${esc(d.educationLevel)}</tem:EducationLevel>` : ''}
           ${d.maritalStatus ? `<tem:MaritalStatus>${esc(d.maritalStatus)}</tem:MaritalStatus>` : ''}
           ${d.address1 ? `
           <tem:PhysicalAddress>
