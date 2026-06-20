@@ -1,14 +1,6 @@
 /**
  * worker.js — E-fficient Finance Widget
  * Cloudflare Worker: API proxy, auth, CORS, dealer routing
- *
- * All secrets are stored in Cloudflare Worker environment variables:
- *   SERITI_API_KEY        — Seriti API key
- *   SERITI_API_SECRET     — Seriti API secret
- *   EDITH_COMPANY_CODE    — Edith CompanyCode
- *   EDITH_COMPANY_PASS    — Edith CompanyPassword
- *
- * Set these with: wrangler secret put SERITI_API_KEY
  */
 
 import { isOriginAllowed, getDealerConfig } from './dealers/dealers.config.js';
@@ -72,45 +64,30 @@ export default {
     try {
       const path = url.pathname;
 
-      // ── Dealer config endpoint (used by frontend to load theme) ──
       if (path === '/api/dealer/config' && method === 'GET') {
         return handleDealerConfig(request, ctx2, jsonResponse);
       }
-
-      // ── Seriti: Pre-Qualification (Step 1) ──
       if (path === '/api/financing/pre-qualification' && method === 'POST') {
         return handlePreQual(request, ctx2, jsonResponse);
       }
-
-      // ── Seriti: Prediction (Step 2 result) ──
       if (path === '/api/financing/prediction' && method === 'POST') {
         return handlePrediction(request, ctx2, jsonResponse);
       }
-
-      // ── Address search & lookups ──
       if (path === '/api/address-search' && method === 'GET') {
         return handleAddressSearch(request, ctx2, jsonResponse);
       }
       if (path.startsWith('/api/lookup/') && method === 'GET') {
         return handleLookups(request, ctx2, jsonResponse);
       }
-
-      // ── Seriti: Get Applicant (consent → Step 3 prefill) ──
       if (path === '/api/financing/applicant' && method === 'GET') {
         return handleGetApplicant(request, ctx2, jsonResponse);
       }
-
-      // ── Edith: Create Policy (Step 3 submit) ──
       if (path === '/api/policy/create' && method === 'POST') {
         return handleCreatePolicy(request, ctx2, jsonResponse);
       }
-
-      // ── Edith: Submit Documents (Fast Application) ──
       if (path === '/api/policy/documents' && method === 'POST') {
         return handleSubmitDocuments(request, ctx2, jsonResponse);
       }
-
-      // ── Policies: GET endpoint for dealer CRM integration ──
       if (path === '/api/policies' && method === 'GET') {
         return handleGetPolicies(request, ctx2, jsonResponse);
       }
