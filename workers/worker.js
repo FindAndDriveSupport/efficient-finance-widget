@@ -17,9 +17,9 @@ import { handleLookups }         from './routes/lookups.js';
 // ── CORS headers ──────────────────────────────────────────────
 
 function corsHeaders(origin, env) {
-  const allowed = isOriginAllowed(origin) || env.WORKER_ENV === 'development';
+  const allowed = !origin || isOriginAllowed(origin) || env.WORKER_ENV === 'development';
   return {
-    'Access-Control-Allow-Origin': allowed ? origin : 'null',
+    'Access-Control-Allow-Origin': allowed ? (origin || '*') : 'null',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Dealer-Key, X-Api-Key',
     'Access-Control-Max-Age': '86400',
@@ -49,7 +49,7 @@ export default {
       return new Response(null, { status: 204, headers: corsHeaders(origin, env) });
     }
 
-    // Block non-whitelisted origins (except in dev)
+    // Block non-whitelisted origins (except in dev or when no origin header)
     if (origin && env.WORKER_ENV !== 'development' && !isOriginAllowed(origin)) {
       return jsonResponse({ error: 'Origin not permitted' }, 403, origin, env);
     }
