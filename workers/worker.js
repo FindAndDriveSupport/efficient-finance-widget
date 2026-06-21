@@ -41,7 +41,12 @@ function jsonResponse(data, status = 200, origin = '*', env = {}) {
 export default {
   async fetch(request, env, ctx) {
     const url    = new URL(request.url);
-    const origin = request.headers.get('Origin') || '';
+    const origin = request.headers.get('Origin') ||
+      (() => {
+        const ref = request.headers.get('Referer');
+        if (!ref) return '';
+        try { return new URL(ref).origin; } catch { return ''; }
+      })();
     const method = request.method;
 
     // Preflight
