@@ -1,107 +1,102 @@
 /**
- * seritiAuth.js
- * Manages Seriti API bearer token with automatic refresh (token expires hourly).
- * Uses Cloudflare KV for token caching across Worker instances.
+ * worker.js — E-fficient Finance Widget
+ * Cloudflare Worker: API proxy, auth, CORS, dealer routing
  */
 
-const SERITI_BASE = 'https://seritiapi.findndrive.co.za';
-const TOKEN_BUFFER_SECONDS = 120;
+import { isOriginAllowed, getDealerConfig } from './dealers/dealers.config.js';
+import { handlePreQual }         from './routes/preQual.js';
+import { handlePrediction }      from './routes/prediction.js';
+import { handleGetApplicant }    from './routes/getApplicant.js';
+import { handleCreatePolicy }    from './routes/createPolicy.js';
+import { handleSubmitDocuments } from './routes/submitDocuments.js';
+import { handleDealerConfig }    from './routes/dealerConfig.js';
+import { handleAddressSearch }   from './routes/addressSearch.js';
+import { handleGetPolicies }     from './routes/getPolicies.js';
+import { handleLookups }         from './routes/lookups.js';
 
-function tokenCacheKey(dealerKey) {
-  return dealerKey ? `seriti_token_${dealerKey}` : 'seriti_bearer_token';
-}
+// ── CORS headers ──────────────────────────────────────────────
 
-async function getDealerCredentials(env, dealerKey) {
-  if (!dealerKey || !env.SERITI_CACHE) {
-    return { apiKey: env.SERITI_API_KEY, apiSecret: env.SERITI_API_SECRET };
-  }
-  const [apiKey, apiSecret] = await Promise.all([
-    env.SERITI_CACHE.get(`SERITI_KEY_${dealerKey}`),
-    env.SERITI_CACHE.get(`SERITI_SECRET_${dealerKey}`),
-  ]);
+function corsHeaders(origin, env) {
+  const allowed = isOriginAllowed(origin) || env.WORKER_ENV === 'development';
   return {
-    apiKey: apiKey || env.SERITI_API_KEY,
-    apiSecret: apiSecret || env.SERITI_API_SECRET,
+    'Access-Control-Allow-Origin': allowed ? origin : 'null',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Dealer-Key, X-Api-Key',
+    'Access-Control-Max-Age': '86400',
   };
 }
 
-export async function getSeritiToken(env, dealerKey) {
-  const cacheKey = tokenCacheKey(dealerKey);
-
-  // Try cache first
-  if (env.SERITI_CACHE) {
-    const cached = await env.SERITI_CACHE.get(cacheKey, 'json');
-    if (cached && cached.token && cached.expiresAt > Date.now()) {
-      return cached.token;
-    }
-  }
-
-  // Get dealer-specific or global credentials
-  const { apiKey, apiSecret } = await getDealerCredentials(env, dealerKey);
-
-  if (!apiKey || !apiSecret) {
-    throw new Error(`Seriti credentials not found for dealer: ${dealerKey || 'global'}`);
-  }
-
-  // Fetch new token
-  const response = await fetch(`${SERITI_BASE}/api/Authentication/token`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ApiKeyId: apiKey, apiSecret }),
-  });
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`Seriti auth failed (${response.status}): ${text}`);
-  }
-
-  const data = await response.json();
-  const token = data.token || data.access_token || data.accessToken;
-  if (!token) throw new Error('Seriti auth: no token in response');
-
-  // Cache for 58 minutes
-  if (env.SERITI_CACHE) {
-    const expiresAt = Date.now() + (58 * 60 * 1000);
-    await env.SERITI_CACHE.put(cacheKey, JSON.stringify({ token, expiresAt }), {
-      expirationTtl: 3480,
-    });
-  }
-
-  return token;
-}
-
-export async function seritiRequest(path, options = {}, env, dealerKey) {
-  const token = await getSeritiToken(env, dealerKey);
-  const url = `${SERITI_BASE}${path}`;
-
-  const response = await fetch(url, {
-    ...options,
+function jsonResponse(data, status = 200, origin = '*', env = {}) {
+  return new Response(JSON.stringify(data), {
+    status,
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-      ...(options.headers || {}),
+      ...corsHeaders(origin, env),
     },
   });
-
-  const text = await response.text();
-
-  // Log full Seriti response for diagnostics
-  console.log(JSON.stringify({
-    level: 'info',
-    type: 'seriti_response',
-    path,
-    dealerKey,
-    status: response.status,
-    body: text.substring(0, 2000),
-    ts: new Date().toISOString(),
-  }));
-
-  let data;
-  try { data = JSON.parse(text); } catch { data = { raw: text }; }
-
-  if (!response.ok) {
-    throw new Error(`Seriti API error (${response.status}): ${JSON.stringify(data)}`);
-  }
-
-  return data;
 }
+
+// ── Main fetch handler ────────────────────────────────────────
+
+export default {
+  async fetch(request, env, ctx) {
+    const url    = new URL(request.url);
+    const origin = request.headers.get('Origin') || '';
+    const method = request.method;
+
+    // Preflight
+    if (method === 'OPTIONS') {
+      return new Response(null, { status: 204, headers: corsHeaders(origin, env) });
+    }
+
+    // Block non-whitelisted origins (except in dev)
+    if (origin && env.WORKER_ENV !== 'development' && !isOriginAllowed(origin)) {
+      return jsonResponse({ error: 'Origin not permitted' }, 403, origin, env);
+    }
+
+    // Dealer context — from header or query param
+    const dealerKey    = request.headers.get('X-Dealer-Key') || url.searchParams.get('dealer');
+    const dealerConfig = getDealerConfig(dealerKey, origin);
+
+    // Inject env + dealerConfig into a context object
+    const ctx2 = { env, dealerConfig, origin, ctx };
+
+    try {
+      const path = url.pathname;
+
+      if (path === '/api/dealer/config' && method === 'GET') {
+        return handleDealerConfig(request, ctx2, jsonResponse);
+      }
+      if (path === '/api/financing/pre-qualification' && method === 'POST') {
+        return handlePreQual(request, ctx2, jsonResponse);
+      }
+      if (path === '/api/financing/prediction' && method === 'POST') {
+        return handlePrediction(request, ctx2, jsonResponse);
+      }
+      if (path === '/api/address-search' && method === 'GET') {
+        return handleAddressSearch(request, ctx2, jsonResponse);
+      }
+      if (path.startsWith('/api/lookup/') && method === 'GET') {
+        return handleLookups(request, ctx2, jsonResponse);
+      }
+      if (path === '/api/financing/applicant' && method === 'GET') {
+        return handleGetApplicant(request, ctx2, jsonResponse);
+      }
+      if (path === '/api/policy/create' && method === 'POST') {
+        return handleCreatePolicy(request, ctx2, jsonResponse);
+      }
+      if (path === '/api/policy/documents' && method === 'POST') {
+        return handleSubmitDocuments(request, ctx2, jsonResponse);
+      }
+      if (path === '/api/policies' && method === 'GET') {
+        return handleGetPolicies(request, ctx2, jsonResponse);
+      }
+
+      return jsonResponse({ error: 'Not found' }, 404, origin, env);
+
+    } catch (err) {
+      console.error('[Worker] Unhandled error:', err);
+      return jsonResponse({ error: 'Internal server error', details: err.message }, 500, origin, env);
+    }
+  },
+};
