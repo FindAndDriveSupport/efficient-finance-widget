@@ -49,6 +49,15 @@ export default {
       })();
     const method = request.method;
 
+    console.log(JSON.stringify({
+      level: 'info',
+      type: 'cors_debug',
+      origin,
+      referer: request.headers.get('Referer'),
+      originHeader: request.headers.get('Origin'),
+      ts: new Date().toISOString(),
+    }));
+
     // Preflight
     if (method === 'OPTIONS') {
       return new Response(null, { status: 204, headers: corsHeaders(origin, env) });
