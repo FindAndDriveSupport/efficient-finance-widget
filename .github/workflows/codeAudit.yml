@@ -49,6 +49,24 @@ jobs:
             echo "❌ Missing spouse block in createPolicy.js" && exit 1
           fi
 
+      - name: "[createPolicy] Spouse IDType present"
+        run: |
+          if ! grep -q "spouseIdType" workers/routes/createPolicy.js; then
+            echo "❌ Missing spouse IDType in createPolicy.js" && exit 1
+          fi
+
+      - name: "[createPolicy] MarriageType present"
+        run: |
+          if ! grep -q "MarriageType" workers/routes/createPolicy.js; then
+            echo "❌ Missing MarriageType in createPolicy.js" && exit 1
+          fi
+
+      - name: "[createPolicy] MarriageDate present"
+        run: |
+          if ! grep -q "MarriageDate" workers/routes/createPolicy.js; then
+            echo "❌ Missing MarriageDate in createPolicy.js" && exit 1
+          fi
+
       - name: "[createPolicy] preQualTotal fallback present"
         run: |
           if ! grep -q "preQualTotal" workers/routes/createPolicy.js; then
@@ -81,6 +99,18 @@ jobs:
             echo "❌ Missing isProd credential switching in submitDocuments.js" && exit 1
           fi
 
+      - name: "[submitDocuments] Validation logging present"
+        run: |
+          if ! grep -q "submit_docs_validation" workers/routes/submitDocuments.js; then
+            echo "❌ Missing validation logging in submitDocuments.js" && exit 1
+          fi
+
+      - name: "[submitDocuments] heic extension supported"
+        run: |
+          if ! grep -q "heic" workers/routes/submitDocuments.js; then
+            echo "❌ Missing heic extension in submitDocuments.js" && exit 1
+          fi
+
       # ── prediction.js ────────────────────────────────────────
 
       - name: "[prediction] 409 PATCH fallback present"
@@ -105,6 +135,12 @@ jobs:
         run: |
           if grep -q "livingExpenses.*seritiPayload\|seritiPayload.*livingExpenses" workers/routes/prediction.js; then
             echo "❌ livingExpenses incorrectly included in prediction payload" && exit 1
+          fi
+
+      - name: "[prediction] Request logging present"
+        run: |
+          if ! grep -q "seriti_prediction_request" workers/routes/prediction.js; then
+            echo "❌ Missing request logging in prediction.js" && exit 1
           fi
 
       # ── seritiAuth.js ────────────────────────────────────────
@@ -135,7 +171,7 @@ jobs:
             echo "❌ Missing Referer fallback for Origin in worker.js" && exit 1
           fi
 
-      - name: "[worker] No debug console.error test alert"
+      - name: "[worker] No debug logs"
         run: |
           if grep -q "test alert\|cors_debug" workers/worker.js; then
             echo "❌ Debug log found in worker.js" && exit 1
@@ -155,13 +191,13 @@ jobs:
             echo "❌ yonda-bike missing from dealers.config.js" && exit 1
           fi
 
-      - name: "[dealers] edithEnv present on all dealers"
+      - name: "[dealers] edithEnv present"
         run: |
           if ! grep -q "edithEnv" workers/dealers/dealers.config.js; then
             echo "❌ Missing edithEnv in dealers.config.js" && exit 1
           fi
 
-      - name: "[dealers] Referer fallback in isOriginAllowed"
+      - name: "[dealers] isOriginAllowed present"
         run: |
           if ! grep -q "isOriginAllowed" workers/dealers/dealers.config.js; then
             echo "❌ Missing isOriginAllowed in dealers.config.js" && exit 1
