@@ -74,8 +74,26 @@ export async function handlePrediction(request, ctx, jsonResponse) {
         return jsonResponse({ error: 'Seriti API error', details: patchErr.message }, 502, origin, env);
       }
     } else {
-      // Check if the error message indicates a 502/503 from Seriti
-      const isSystemDown = msg.includes('502') || msg.includes('503') || msg.includes('unavailable') || msg.includes('Bad Gateway');
+      // Check if the error is an IDAS bureau failure (no credit profile found)
+      const isIdasFailure = msg.includes('500') && msg.includes('Idas');
+      const isSystemDown = !isIdasFailure && (msg.includes('502') || msg.includes('503') || msg.includes('500') || msg.includes('unavailable') || msg.includes('Bad Gateway'));
+
+      if (isIdasFailure) {
+        console.error(JSON.stringify({
+          level: 'error',
+          type: 'seriti_idas_failure',
+          dealerKey: dealerConfig?.key,
+          applicantId,
+          error: msg.substring(0, 500),
+          ts: new Date().toISOString(),
+        }));
+        return jsonResponse({
+          error: 'No credit bureau information found for this ID number.',
+          code: 500,
+          idasFailed: true,
+        }, 200, origin, env);
+      }
+
       if (isSystemDown) {
         console.error(JSON.stringify({
           level: 'error',
