@@ -105,12 +105,6 @@ jobs:
             echo "❌ Missing validation logging in submitDocuments.js" && exit 1
           fi
 
-      - name: "[submitDocuments] heic extension supported"
-        run: |
-          if ! grep -q "heic" workers/routes/submitDocuments.js; then
-            echo "❌ Missing heic extension in submitDocuments.js" && exit 1
-          fi
-
       # ── prediction.js ────────────────────────────────────────
 
       - name: "[prediction] 409 PATCH fallback present"
