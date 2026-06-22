@@ -34,23 +34,28 @@ export async function handleSubmitDocuments(request, ctx, jsonResponse) {
   const { policyNumber, salesRef, documents } = body;
 
   if (!policyNumber) {
+    console.error(JSON.stringify({ level: 'error', type: 'submit_docs_validation', reason: 'missing_policyNumber', dealerKey: dealerConfig?.key, ts: new Date().toISOString() }));
     return jsonResponse({ error: 'Missing policyNumber' }, 400, origin, env);
   }
   if (!Array.isArray(documents) || documents.length === 0) {
+    console.error(JSON.stringify({ level: 'error', type: 'submit_docs_validation', reason: 'no_documents', dealerKey: dealerConfig?.key, policyNumber, ts: new Date().toISOString() }));
     return jsonResponse({ error: 'No documents provided' }, 400, origin, env);
   }
 
   // Validate each document
   for (const doc of documents) {
     if (!doc.base64) {
+      console.error(JSON.stringify({ level: 'error', type: 'submit_docs_validation', reason: 'missing_base64', category: doc.category, dealerKey: dealerConfig?.key, policyNumber, ts: new Date().toISOString() }));
       return jsonResponse({ error: 'Each document requires base64 content' }, 400, origin, env);
     }
     const ext = (doc.fileExtension || '').toLowerCase().replace(/^\./, '');
     if (!ALLOWED_EXTENSIONS.has(ext)) {
+      console.error(JSON.stringify({ level: 'error', type: 'submit_docs_validation', reason: 'invalid_extension', ext, dealerKey: dealerConfig?.key, policyNumber, ts: new Date().toISOString() }));
       return jsonResponse({ error: `Invalid file extension: ${doc.fileExtension}` }, 400, origin, env);
     }
     const category = (doc.category || '').toUpperCase();
     if (!ALLOWED_CATEGORIES.has(category)) {
+      console.error(JSON.stringify({ level: 'error', type: 'submit_docs_validation', reason: 'invalid_category', category, dealerKey: dealerConfig?.key, policyNumber, ts: new Date().toISOString() }));
       return jsonResponse({ error: `Invalid document category: ${doc.category}` }, 400, origin, env);
     }
   }
