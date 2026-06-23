@@ -13,6 +13,7 @@
  *   - Feature flags
  *   - Finance type
  *   - Edith environment (dev | prod)
+ *   - Contact email for failure notifications
  */
 
 export const DEALERS = {
@@ -24,6 +25,7 @@ export const DEALERS = {
     branchCode: 'SRT001EM',
     financeType: 'vehicle',
     edithEnv: 'dev',
+    contactEmail: 'support@findndrive.co.za',
     allowedDomains: [
       'findndrive.co.za',
       'www.findndrive.co.za',
@@ -56,6 +58,7 @@ export const DEALERS = {
     branchCode: 'KAEF001',
     financeType: 'vehicle',
     edithEnv: 'prod',
+    contactEmail: 'yvette@keitzmanfinance.co.za',
     allowedDomains: [
       'keitzmanfinance.co.za',
       'keitzman-finance.seritifinance.findndrive.co.za',
@@ -82,6 +85,7 @@ export const DEALERS = {
     branchCode: 'YOND001',
     financeType: 'bike',
     edithEnv: 'prod',
+    contactEmail: 'marketing@yonda.co.za',
     allowedDomains: [
       'yonda.co.za',
       'yonda-bike.seritifinance.findndrive.co.za',
