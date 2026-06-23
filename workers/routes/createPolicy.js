@@ -62,6 +62,15 @@ export async function handleCreatePolicy(request, ctx, jsonResponse) {
       ts: new Date().toISOString(),
     }));
     edithResponse = parseEdithXMLResponse(text);
+    console.log(JSON.stringify({
+      level: 'info',
+      type: 'edith_parsed',
+      salesRef,
+      statusCode: edithResponse.statusCode,
+      policyNumber: edithResponse.policyNumber,
+      errorCount: edithResponse.errors.length,
+      ts: new Date().toISOString(),
+    }));
   } catch (err) {
     logError('edith_network_error', err, env, { salesRef, dealerKey: dealerConfig.key });
     return jsonResponse({
@@ -93,6 +102,7 @@ export async function handleCreatePolicy(request, ctx, jsonResponse) {
       logError('edith_field_errors', fatal, env, { salesRef });
       return jsonResponse({
         success: false,
+        policyNumber: edithResponse.policyNumber || null,
         errors: fatal,
         warnings,
         code: 300,
@@ -104,6 +114,7 @@ export async function handleCreatePolicy(request, ctx, jsonResponse) {
     return jsonResponse({
       success: true,
       policyNumber: edithResponse.policyNumber,
+      salesRef,
       warnings,
       code: 200,
     }, 200, origin, env);
@@ -270,20 +281,25 @@ function parseEdithXMLResponse(xml) {
     const match = xml.match(new RegExp(`<[^>]*${tag}[^>]*>([^<]*)<`, 'i'));
     return match ? match[1].trim() : null;
   };
-  const statusCode = parseInt(getTag('StatusCode') || getTag('ReturnCode') || '100');
+
+  // Read StatusCode from inside <response> block only, not <PolicyStatusCode> etc.
+  const responseStatusMatch = xml.match(/<response[^>]*>[\s\S]*?<StatusCode[^>]*>([^<]*)<\/StatusCode>/i);
+  const statusCode = parseInt(responseStatusMatch?.[1] || '100');
+
   const policyNumber = getTag('PolicyNumber');
   const errors = [];
 
-  const errorMatches = xml.matchAll(/<Error[^>]*>([\s\S]*?)<\/Error>/gi);
+  // Fixed: <InputError> not <Error>, <FieldStatusCode> not <StatusCode>, <Description> not <ErrorMessage>
+  const errorMatches = xml.matchAll(/<InputError[^>]*>([\s\S]*?)<\/InputError>/gi);
   for (const m of errorMatches) {
     const fieldMatch = m[1].match(/<FieldName[^>]*>([^<]*)<\/FieldName>/i);
-    const codeMatch  = m[1].match(/<StatusCode[^>]*>([^<]*)<\/StatusCode>/i);
-    const msgMatch   = m[1].match(/<ErrorMessage[^>]*>([^<]*)<\/ErrorMessage>/i);
+    const codeMatch  = m[1].match(/<FieldStatusCode[^>]*>([^<]*)<\/FieldStatusCode>/i);
+    const msgMatch   = m[1].match(/<Description[^>]*>([^<]*)<\/Description>/i);
     if (fieldMatch) {
       errors.push({
-        FieldName:    fieldMatch[1],
+        FieldName:    fieldMatch[1].trim(),
         StatusCode:   parseInt(codeMatch?.[1] || '300'),
-        ErrorMessage: msgMatch?.[1] || '',
+        ErrorMessage: msgMatch?.[1]?.trim() || '',
       });
     }
   }
