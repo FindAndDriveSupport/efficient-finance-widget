@@ -282,8 +282,8 @@ function parseEdithXMLResponse(xml) {
     return match ? match[1].trim() : null;
   };
 
-  // Read StatusCode from inside <response> block only, not <PolicyStatusCode> etc.
-  const responseStatusMatch = xml.match(/<response[^>]*>[\s\S]*?<StatusCode[^>]*>([^<]*)<\/StatusCode>/i);
+  // Greedy match to get the LAST StatusCode inside <response> — skips per-error StatusCodes
+  const responseStatusMatch = xml.match(/<response[^>]*>[\s\S]*<StatusCode[^>]*>([^<]*)<\/StatusCode>/i);
   const statusCode = parseInt(responseStatusMatch?.[1] || '100');
 
   const policyNumber = getTag('PolicyNumber');
