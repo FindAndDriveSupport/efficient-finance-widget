@@ -108,6 +108,30 @@ export const DEALERS = {
   // ─────────────────────────────────────────────────────────────
 };
 
+
+  'north-western-motors': {
+    name: 'North Western Motors',
+    branchCode: 'NWMC001',
+    financeType: 'vehicle',
+    edithEnv: 'prod',
+    contactEmail: 'denise@northwestern.co.za',
+    allowedDomains: [
+      'northwesternmotors.co.za',
+      'north-western-motors.seritifinance.findndrive.co.za',
+      'seritifinance.findndrive.co.za',
+    ],
+    theme: {
+      primary: '#0a1361',
+      gradient: 'linear-gradient(135deg, #0a1361 0%, #0a1361 100%)',
+      fontFamily: "'Inter', sans-serif",
+      borderRadius: '12px',
+    },
+    features: {
+      showDeposit: true,
+      showCurrentFinance: true,
+      vehicleQueryParams: true,
+    },
+  },
 // ── Lookup helpers ────────────────────────────────────────────
 
 /**
