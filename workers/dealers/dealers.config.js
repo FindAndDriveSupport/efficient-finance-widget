@@ -104,11 +104,8 @@ export const DEALERS = {
   },
 
   // ─────────────────────────────────────────────────────────────
-  // ADD MORE DEALERS BELOW — copy a block, change the values
+  // North Western Motors
   // ─────────────────────────────────────────────────────────────
-};
-
-
   'north-western-motors': {
     name: 'North Western Motors',
     branchCode: 'NWMC001',
@@ -132,6 +129,12 @@ export const DEALERS = {
       vehicleQueryParams: true,
     },
   },
+
+  // ─────────────────────────────────────────────────────────────
+  // ADD MORE DEALERS BELOW — copy a block, change the values
+  // ─────────────────────────────────────────────────────────────
+};
+
 // ── Lookup helpers ────────────────────────────────────────────
 
 /**
