@@ -14,6 +14,7 @@
  *   - Finance type
  *   - Edith environment (dev | prod)
  *   - Contact email for failure notifications
+ *   - Billing type (transaction | fixed)
  */
 
 export const DEALERS = {
@@ -26,6 +27,7 @@ export const DEALERS = {
     financeType: 'vehicle',
     edithEnv: 'dev',
     contactEmail: 'support@findndrive.co.za',
+    billingType: 'transaction',
     allowedDomains: [
       'findndrive.co.za',
       'www.findndrive.co.za',
@@ -59,6 +61,7 @@ export const DEALERS = {
     financeType: 'vehicle',
     edithEnv: 'prod',
     contactEmail: 'yvette@keitzmanfinance.co.za',
+    billingType: 'fixed',
     allowedDomains: [
       'keitzmanfinance.co.za',
       'keitzman-finance.seritifinance.findndrive.co.za',
@@ -86,6 +89,7 @@ export const DEALERS = {
     financeType: 'bike',
     edithEnv: 'prod',
     contactEmail: 'marketing@yonda.co.za',
+    billingType: 'fixed',
     allowedDomains: [
       'yonda.co.za',
       'yonda-bike.seritifinance.findndrive.co.za',
@@ -112,6 +116,7 @@ export const DEALERS = {
     financeType: 'vehicle',
     edithEnv: 'prod',
     contactEmail: 'denise@northwestern.co.za',
+    billingType: 'transaction',
     allowedDomains: [
       'northwesternmotors.co.za',
       'north-western-motors.seritifinance.findndrive.co.za',
