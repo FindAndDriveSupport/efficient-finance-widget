@@ -79,6 +79,24 @@ jobs:
             echo "❌ Consents using true/false instead of 1/0 in createPolicy.js" && exit 1
           fi
 
+      - name: "[createPolicy] branchCodeOverride support present"
+        run: |
+          if ! grep -q "branchCodeOverride" workers/routes/createPolicy.js; then
+            echo "❌ Missing branchCodeOverride support in createPolicy.js" && exit 1
+          fi
+
+      - name: "[createPolicy] salaryDay overflow guard present"
+        run: |
+          if ! grep -q "Number(d.salaryDay) >= 1 && Number(d.salaryDay) <= 31" workers/routes/createPolicy.js; then
+            echo "❌ Missing salaryDay overflow guard in createPolicy.js" && exit 1
+          fi
+
+      - name: "[createPolicy] recordFailure does not insert policy_number"
+        run: |
+          if grep -qE "dealer_key, policy_number, applicant_id, sales_ref, branch_code, finance_type,\s*$" workers/routes/createPolicy.js; then
+            echo "❌ recordFailure still inserting policy_number — D1 NOT NULL fix missing" && exit 1
+          fi
+
       # ── submitDocuments.js ───────────────────────────────────
 
       - name: "[submitDocuments] export keyword present"
@@ -137,6 +155,26 @@ jobs:
             echo "❌ Missing request logging in prediction.js" && exit 1
           fi
 
+      # ── preQual.js ───────────────────────────────────────────
+
+      - name: "[preQual] hasExistingFinance mapped"
+        run: |
+          if ! grep -q "hasExistingFinance" workers/routes/preQual.js; then
+            echo "❌ Missing hasExistingFinance mapping in preQual.js" && exit 1
+          fi
+
+      - name: "[preQual] deposit mapped from depositAmount"
+        run: |
+          if ! grep -q "depositAmount" workers/routes/preQual.js; then
+            echo "❌ Missing depositAmount mapping in preQual.js" && exit 1
+          fi
+
+      - name: "[preQual] currentInstalment mapped from financeAmount"
+        run: |
+          if ! grep -q "financeAmount" workers/routes/preQual.js; then
+            echo "❌ Missing financeAmount mapping in preQual.js" && exit 1
+          fi
+
       # ── seritiAuth.js ────────────────────────────────────────
 
       - name: "[seritiAuth] Response logging present"
@@ -171,6 +209,26 @@ jobs:
             echo "❌ Debug log found in worker.js" && exit 1
           fi
 
+      - name: "[worker] branchCode query param override present"
+        run: |
+          if ! grep -q "branchOverride" workers/worker.js; then
+            echo "❌ Missing branchCode query param override in worker.js" && exit 1
+          fi
+
+      # ── dealerConfig.js ──────────────────────────────────────
+
+      - name: "[dealerConfig] branches exposed to frontend"
+        run: |
+          if ! grep -q "branches" workers/routes/dealerConfig.js; then
+            echo "❌ Missing branches field in dealerConfig.js response" && exit 1
+          fi
+
+      - name: "[dealerConfig] financeType exposed to frontend"
+        run: |
+          if ! grep -q "financeType" workers/routes/dealerConfig.js; then
+            echo "❌ Missing financeType field in dealerConfig.js response" && exit 1
+          fi
+
       # ── dealers.config.js ────────────────────────────────────
 
       - name: "[dealers] keitzman-finance present"
@@ -185,10 +243,22 @@ jobs:
             echo "❌ yonda-bike missing from dealers.config.js" && exit 1
           fi
 
+      - name: "[dealers] north-western-motors present"
+        run: |
+          if ! grep -q "north-western-motors" workers/dealers/dealers.config.js; then
+            echo "❌ north-western-motors missing from dealers.config.js" && exit 1
+          fi
+
       - name: "[dealers] edithEnv present"
         run: |
           if ! grep -q "edithEnv" workers/dealers/dealers.config.js; then
             echo "❌ Missing edithEnv in dealers.config.js" && exit 1
+          fi
+
+      - name: "[dealers] billingType present"
+        run: |
+          if ! grep -q "billingType" workers/dealers/dealers.config.js; then
+            echo "❌ Missing billingType in dealers.config.js" && exit 1
           fi
 
       - name: "[dealers] isOriginAllowed present"
@@ -199,4 +269,3 @@ jobs:
 
       - name: "✅ All checks passed"
         run: echo "✅ Code audit passed — all files look correct"
-
