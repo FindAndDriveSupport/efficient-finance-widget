@@ -93,7 +93,7 @@ jobs:
 
       - name: "[createPolicy] recordFailure does not insert policy_number"
         run: |
-          if grep -qE "dealer_key, policy_number, applicant_id, sales_ref, branch_code, finance_type,\s*$" workers/routes/createPolicy.js; then
+          if awk '/async function recordFailure/,/^}/' workers/routes/createPolicy.js | grep -q "policy_number"; then
             echo "❌ recordFailure still inserting policy_number — D1 NOT NULL fix missing" && exit 1
           fi
 
