@@ -15,6 +15,7 @@
  *   - Edith environment (dev | prod)
  *   - Contact email for failure notifications
  *   - Billing type (transaction | fixed)
+ *   - Branches (optional — for multi-branch dealer groups)
  */
 
 export const DEALERS = {
@@ -142,17 +143,11 @@ export const DEALERS = {
 
 // ── Lookup helpers ────────────────────────────────────────────
 
-/**
- * Get dealer config by dealerKey param or referring domain.
- * Priority: explicit ?dealer= param → referring domain match → first dealer
- */
 export function getDealerConfig(dealerKey, referringDomain) {
-  // 1. Explicit key (from query param ?dealer=findndrive)
   if (dealerKey && DEALERS[dealerKey]) {
     return { key: dealerKey, ...DEALERS[dealerKey] };
   }
 
-  // 2. Match by referring domain
   if (referringDomain) {
     const hostname = referringDomain.replace(/^https?:\/\//, '').split('/')[0];
     for (const [key, config] of Object.entries(DEALERS)) {
@@ -162,15 +157,10 @@ export function getDealerConfig(dealerKey, referringDomain) {
     }
   }
 
-  // 3. Fallback to first dealer
   const [firstKey, firstConfig] = Object.entries(DEALERS)[0];
   return { key: firstKey, ...firstConfig };
 }
 
-/**
- * Check whether a given origin is whitelisted for any dealer.
- * Used by the CORS / embed middleware.
- */
 export function isOriginAllowed(origin) {
   if (!origin) return false;
   const hostname = origin.replace(/^https?:\/\//, '').split('/')[0].split(':')[0];
