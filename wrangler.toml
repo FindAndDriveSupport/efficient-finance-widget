@@ -28,3 +28,8 @@ name = "efficient-finance-widget-dev"
 
 [env.development.vars]
 WORKER_ENV = "development"
+
+# Daily Edith policy status sync — runs at 02:00 UTC
+[triggers]
+crons = ["0 2 * * *"]
+
