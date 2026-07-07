@@ -306,9 +306,7 @@ async function soapFetch(wsdlUrl, xml, action) {
 
 function parseStatusListXML(xml) {
   const items = [];
-  // Assumes each list entry is wrapped in a repeating block — adjust tag
-  // name ("PolicyStatusDetail" is a guess) once real XML is seen.
-  const blocks = xml.matchAll(/<PolicyStatusDetail[^>]*>([\s\S]*?)<\/PolicyStatusDetail>/gi);
+  const blocks = xml.matchAll(/<PolicyStatus>([\s\S]*?)<\/PolicyStatus>/gi);
   for (const b of blocks) {
     const block = b[1];
     items.push({
