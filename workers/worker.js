@@ -104,6 +104,20 @@ export default {
         return handleGetPolicies(request, ctx2, jsonResponse);
       }
 
+      // ── TEMPORARY DEBUG ROUTE — remove after testing statusSync ──
+      // Manually triggers the daily Edith status sync over HTTP, since
+      // Cloudflare's dashboard has no "run cron now" button. Gated behind
+      // a secret query param so it can't be triggered by randoms hitting
+      // the URL. Set DEBUG_SYNC_KEY via `wrangler secret put DEBUG_SYNC_KEY`.
+      if (path === '/api/debug/run-status-sync' && method === 'GET') {
+        const key = url.searchParams.get('key');
+        if (!env.DEBUG_SYNC_KEY || key !== env.DEBUG_SYNC_KEY) {
+          return jsonResponse({ error: 'Not found' }, 404, origin, env);
+        }
+        const result = await runStatusSync(env);
+        return jsonResponse(result, 200, origin, env);
+      }
+
       return jsonResponse({ error: 'Not found' }, 404, origin, env);
 
     } catch (err) {
