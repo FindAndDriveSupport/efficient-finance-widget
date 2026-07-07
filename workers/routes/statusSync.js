@@ -35,6 +35,8 @@
  * run against a real Edith response and adjust tag names if needed.
  */
 
+import { DEALERS } from '../dealers/dealers.config.js';
+
 const RETRY_LIMIT = 2;
 const RETRY_DELAY_MS = 2000;
 const DETAIL_FETCH_CONCURRENCY = 5;
@@ -43,38 +45,52 @@ const KV_LAST_RUN_KEY = 'edith:last_status_sync';
 export async function runStatusSync(env) {
   const now = new Date();
   const lastRun = await getLastRunDate(env);
+  const result = await processStatusSync(env, lastRun);
+  await setLastRunDate(env, now);
+  return result;
+}
+
+// One-time (or repeatable) historical backfill — queries Edith all the way
+// back to a fixed early date instead of "since last run", so policies whose
+// last edit predates this sync system ever running still get picked up.
+// Does NOT touch the incremental KV timestamp, so it won't interfere with
+// the daily cron's "since last run" window.
+export async function runFullBackfill(env, sinceDate = '01-jan-2020 00:00') {
+  return processStatusSync(env, sinceDate);
+}
+
+async function processStatusSync(env, startDate) {
   const { companyCode, companyPass, wsdlUrl } = selectEdithCredentials(env);
 
   console.log(JSON.stringify({
     level: 'info',
     type: 'status_sync_start',
-    startDate: lastRun,
-    ts: now.toISOString(),
+    startDate,
+    ts: new Date().toISOString(),
   }));
 
   let statusList;
   try {
-    statusList = await getPolicyStatusList(wsdlUrl, companyCode, companyPass, lastRun);
+    statusList = await getPolicyStatusList(wsdlUrl, companyCode, companyPass, startDate);
   } catch (err) {
     logError('status_sync_list_failed', { message: err.message }, env);
-    return { checked: 0, updated: 0, detailFetches: 0, error: err.message };
+    return { checked: 0, updated: 0, inserted: 0, detailFetches: 0, error: err.message };
   }
 
   if (!statusList.length) {
-    console.log(JSON.stringify({ level: 'info', type: 'status_sync_no_changes', ts: now.toISOString() }));
-    await setLastRunDate(env, now);
-    return { checked: 0, updated: 0, detailFetches: 0 };
+    console.log(JSON.stringify({ level: 'info', type: 'status_sync_no_changes', ts: new Date().toISOString() }));
+    return { checked: 0, updated: 0, inserted: 0, detailFetches: 0 };
   }
 
   console.log(JSON.stringify({
     level: 'info',
     type: 'status_sync_changes_found',
     count: statusList.length,
-    ts: now.toISOString(),
+    ts: new Date().toISOString(),
   }));
 
   const policyNumbers = statusList.map((p) => p.PolicyNumber).filter(Boolean);
-  const existingRows = await getExistingAccessDates(env, policyNumbers);
+  const existingRows = await getExistingRows(env, policyNumbers);
 
   const needsDetail = [];
   const statusOnly = [];
@@ -93,6 +109,7 @@ export async function runStatusSync(env) {
   }
 
   let updatedCount = 0;
+  let insertedCount = 0;
   let detailFetchCount = 0;
 
   for (let i = 0; i < needsDetail.length; i += DETAIL_FETCH_CONCURRENCY) {
@@ -113,41 +130,55 @@ export async function runStatusSync(env) {
       const details = result.value;
       detailFetchCount++;
 
-      await upsertPolicyStatus(env, {
+      const wrote = await upsertPolicyStatus(env, {
         policyNumber: entry.PolicyNumber,
+        salesRef: entry.SalesReferenceNumber,
+        branchCode: entry.BranchCode,
         applicationStatus: entry.Status,
         financeStatus: details?.FinanceStatus ?? null,
         financeCompany: details?.FinanceCompany ?? null,
         transactionStatus: details?.TransactionStatus ?? null,
         lastAccessDate: entry.LastAccessDate,
       });
-      updatedCount++;
+      if (wrote === 'inserted') insertedCount++;
+      else if (wrote === 'updated') updatedCount++;
     }
   }
 
   for (const entry of statusOnly) {
-    await upsertPolicyStatus(env, {
+    const wrote = await upsertPolicyStatus(env, {
       policyNumber: entry.PolicyNumber,
+      salesRef: entry.SalesReferenceNumber,
+      branchCode: entry.BranchCode,
       applicationStatus: entry.Status,
       financeStatus: undefined,
       financeCompany: undefined,
       transactionStatus: undefined,
       lastAccessDate: entry.LastAccessDate,
     });
-    updatedCount++;
+    if (wrote === 'inserted') insertedCount++;
+    else if (wrote === 'updated') updatedCount++;
   }
-
-  await setLastRunDate(env, now);
 
   console.log(JSON.stringify({
     level: 'info',
     type: 'status_sync_done',
     updated: updatedCount,
+    inserted: insertedCount,
     detailFetches: detailFetchCount,
     ts: new Date().toISOString(),
   }));
 
-  return { checked: statusList.length, updated: updatedCount, detailFetches: detailFetchCount };
+  return { checked: statusList.length, updated: updatedCount, inserted: insertedCount, detailFetches: detailFetchCount };
+}
+
+// ---------- Dealer resolution (for backfill inserts) ----------
+
+function resolveDealerKeyByBranchCode(branchCode) {
+  for (const [key, config] of Object.entries(DEALERS)) {
+    if (config.branchCode === branchCode) return key;
+  }
+  return null;
 }
 
 // ---------- Credential selection (mirrors createPolicy.js) ----------
@@ -187,13 +218,13 @@ function formatEdithDate(date) {
 
 // ---------- D1 helpers (policy_events table) ----------
 
-async function getExistingAccessDates(env, policyNumbers) {
+async function getExistingRows(env, policyNumbers) {
   const map = new Map();
   if (!policyNumbers.length) return map;
 
   const placeholders = policyNumbers.map(() => '?').join(',');
   const stmt = env.DB.prepare(
-    `SELECT policy_number, last_access_date FROM policy_events WHERE policy_number IN (${placeholders})`
+    `SELECT id, policy_number, last_access_date FROM policy_events WHERE policy_number IN (${placeholders})`
   ).bind(...policyNumbers);
 
   const { results } = await stmt.all();
@@ -203,29 +234,76 @@ async function getExistingAccessDates(env, policyNumbers) {
   return map;
 }
 
-async function upsertPolicyStatus(env, { policyNumber, applicationStatus, financeStatus, financeCompany, transactionStatus, lastAccessDate }) {
+// Returns 'updated', 'inserted', or 'skipped' (if a new row was needed but
+// the dealer couldn't be resolved from branchCode, e.g. unknown/retired
+// branch code not present in dealers.config.js).
+async function upsertPolicyStatus(env, {
+  policyNumber, salesRef, branchCode, applicationStatus,
+  financeStatus, financeCompany, transactionStatus, lastAccessDate,
+}) {
   const now = new Date().toISOString();
-  const sets = ['application_status = ?', 'last_access_date = ?', 'status_last_checked = ?'];
-  const values = [applicationStatus, lastAccessDate, now];
 
-  if (financeStatus !== undefined) {
-    sets.push('finance_status = ?');
-    values.push(financeStatus);
-  }
-  if (financeCompany !== undefined) {
-    sets.push('finance_company = ?');
-    values.push(financeCompany);
-  }
-  if (transactionStatus !== undefined) {
-    sets.push('transaction_status = ?');
-    values.push(transactionStatus);
+  const existing = await env.DB.prepare(
+    `SELECT id FROM policy_events WHERE policy_number = ? LIMIT 1`
+  ).bind(policyNumber).first();
+
+  if (existing) {
+    const sets = ['application_status = ?', 'last_access_date = ?', 'status_last_checked = ?'];
+    const values = [applicationStatus, lastAccessDate, now];
+
+    if (financeStatus !== undefined) {
+      sets.push('finance_status = ?');
+      values.push(financeStatus);
+    }
+    if (financeCompany !== undefined) {
+      sets.push('finance_company = ?');
+      values.push(financeCompany);
+    }
+    if (transactionStatus !== undefined) {
+      sets.push('transaction_status = ?');
+      values.push(transactionStatus);
+    }
+
+    values.push(policyNumber);
+
+    await env.DB.prepare(
+      `UPDATE policy_events SET ${sets.join(', ')} WHERE policy_number = ?`
+    ).bind(...values).run();
+
+    return 'updated';
   }
 
-  values.push(policyNumber);
+  // No existing row — this policy predates (or was missed by) createPolicy.js's
+  // write. Backfill a new row, resolving dealer_key from branchCode since
+  // that's all Edith gives us here.
+  const dealerKey = resolveDealerKeyByBranchCode(branchCode);
+  if (!dealerKey) {
+    logError('status_sync_unresolved_dealer', { policyNumber, branchCode }, env);
+    return 'skipped';
+  }
 
-  await env.DB.prepare(
-    `UPDATE policy_events SET ${sets.join(', ')} WHERE policy_number = ?`
-  ).bind(...values).run();
+  await env.DB.prepare(`
+    INSERT INTO policy_events (
+      dealer_key, policy_number, sales_ref, branch_code,
+      status, created_at,
+      application_status, finance_status, finance_company, transaction_status,
+      last_access_date, status_last_checked
+    ) VALUES (?, ?, ?, ?, 'synced', ?, ?, ?, ?, ?, ?, ?)
+  `).bind(
+    dealerKey,
+    policyNumber,
+    salesRef || null,
+    branchCode || null,
+    now,
+    applicationStatus || null,
+    financeStatus ?? null,
+    financeCompany ?? null,
+    transactionStatus ?? null,
+    lastAccessDate || null,
+    now,
+  ).run();
+
+  return 'inserted';
 }
 
 // ---------- Edith SOAP calls ----------
@@ -378,9 +456,12 @@ function parsePolicyDetailsXML(xml) {
   const latestFinanceApp = financeApps[0] || null;
 
   return {
-    // Fallback to a top-level tag in case some responses do include it
+    // Prefer top-level tags — confirmed present once a deal progresses far
+    // enough (e.g. PAID OUT / DELIVERED). Fall back to the nested
+    // FinanceApplications array for earlier-stage deals where the
+    // top-level fields haven't been set yet.
     FinanceStatus: getTag(xml, 'FinanceStatus') || latestFinanceApp?.status || null,
-    FinanceCompany: latestFinanceApp?.companyName || null,
+    FinanceCompany: getTag(xml, 'FinanceCompanyName') || latestFinanceApp?.companyName || null,
     TransactionStatus: getTag(xml, 'TransactionStatus'),
     PolicyNumber: getTag(xml, 'PolicyNumber'),
   };
