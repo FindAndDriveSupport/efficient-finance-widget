@@ -13,7 +13,7 @@ import { handleDealerConfig }    from './routes/dealerConfig.js';
 import { handleAddressSearch }   from './routes/addressSearch.js';
 import { handleGetPolicies }     from './routes/getPolicies.js';
 import { handleLookups }         from './routes/lookups.js';
-import { runStatusSync, debugFetchStatusListXML } from './routes/statusSync.js';
+import { runStatusSync, debugFetchStatusListXML, debugFetchPolicyDetailsXML } from './routes/statusSync.js';
 
 // ── CORS headers ──────────────────────────────────────────────
 
@@ -129,6 +129,32 @@ export default {
         try {
           const { requestXml, responseXml, startDate } = await debugFetchStatusListXML(env);
           const text = `startDate used: ${startDate}\n\n--- REQUEST XML ---\n${requestXml}\n\n--- RESPONSE XML ---\n${responseXml}`;
+          return new Response(text, {
+            status: 200,
+            headers: { 'Content-Type': 'text/plain; charset=utf-8', ...corsHeaders(origin, env) },
+          });
+        } catch (err) {
+          return new Response(`Error calling Edith: ${err.message}`, {
+            status: 500,
+            headers: { 'Content-Type': 'text/plain; charset=utf-8', ...corsHeaders(origin, env) },
+          });
+        }
+      }
+
+      // ── TEMPORARY DEBUG ROUTE — view raw GetPolicyDetails XML in browser ──
+      // Usage: /api/debug/raw-policy-details?key=...&policyNumber=ZAYOND0013130665
+      if (path === '/api/debug/raw-policy-details' && method === 'GET') {
+        const key = url.searchParams.get('key');
+        if (!env.DEBUG_SYNC_KEY || key !== env.DEBUG_SYNC_KEY) {
+          return jsonResponse({ error: 'Not found' }, 404, origin, env);
+        }
+        const policyNumber = url.searchParams.get('policyNumber');
+        if (!policyNumber) {
+          return new Response('Missing ?policyNumber=... param', { status: 400 });
+        }
+        try {
+          const { requestXml, responseXml } = await debugFetchPolicyDetailsXML(env, policyNumber);
+          const text = `--- REQUEST XML ---\n${requestXml}\n\n--- RESPONSE XML ---\n${responseXml}`;
           return new Response(text, {
             status: 200,
             headers: { 'Content-Type': 'text/plain; charset=utf-8', ...corsHeaders(origin, env) },
