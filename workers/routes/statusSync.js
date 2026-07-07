@@ -117,6 +117,7 @@ export async function runStatusSync(env) {
         policyNumber: entry.PolicyNumber,
         applicationStatus: entry.Status,
         financeStatus: details?.FinanceStatus ?? null,
+        financeCompany: details?.FinanceCompany ?? null,
         transactionStatus: details?.TransactionStatus ?? null,
         lastAccessDate: entry.LastAccessDate,
       });
@@ -129,6 +130,7 @@ export async function runStatusSync(env) {
       policyNumber: entry.PolicyNumber,
       applicationStatus: entry.Status,
       financeStatus: undefined,
+      financeCompany: undefined,
       transactionStatus: undefined,
       lastAccessDate: entry.LastAccessDate,
     });
@@ -201,7 +203,7 @@ async function getExistingAccessDates(env, policyNumbers) {
   return map;
 }
 
-async function upsertPolicyStatus(env, { policyNumber, applicationStatus, financeStatus, transactionStatus, lastAccessDate }) {
+async function upsertPolicyStatus(env, { policyNumber, applicationStatus, financeStatus, financeCompany, transactionStatus, lastAccessDate }) {
   const now = new Date().toISOString();
   const sets = ['application_status = ?', 'last_access_date = ?', 'status_last_checked = ?'];
   const values = [applicationStatus, lastAccessDate, now];
@@ -209,6 +211,10 @@ async function upsertPolicyStatus(env, { policyNumber, applicationStatus, financ
   if (financeStatus !== undefined) {
     sets.push('finance_status = ?');
     values.push(financeStatus);
+  }
+  if (financeCompany !== undefined) {
+    sets.push('finance_company = ?');
+    values.push(financeCompany);
   }
   if (transactionStatus !== undefined) {
     sets.push('transaction_status = ?');
@@ -334,8 +340,47 @@ function parseStatusListXML(xml) {
 }
 
 function parsePolicyDetailsXML(xml) {
+  // NB: Real Edith responses do NOT include top-level <FinanceStatus> or
+  // <TransactionStatus> tags on the Policy object (confirmed against a live
+  // response) — despite the spec PDF listing them as Policy fields.
+  //
+  // Finance decisions instead live nested under:
+  //   <FinanceApplications><FinanceApplicationDetail>
+  //     <CompanyName>WESBANK</CompanyName>
+  //     <LatestApplicationStatus>DECLINED</LatestApplicationStatus>
+  //     <LatestApplicationDate>...</LatestApplicationDate>
+  //   </FinanceApplicationDetail>...
+  // — one entry per finance house that's been applied to. We take the
+  // entry with the most recent LatestApplicationDate that actually has a
+  // status, and use its LatestApplicationStatus/CompanyName as our
+  // finance_status / finance_company.
+  //
+  // TransactionStatus appears to genuinely not exist until later in the
+  // deal lifecycle (it's a manually-set dropdown field) — if/when a real
+  // response does include it, the getTag() fallback below will pick it up
+  // without any code change needed.
+
+  const financeApps = [];
+  const appBlocks = xml.matchAll(/<FinanceApplicationDetail>([\s\S]*?)<\/FinanceApplicationDetail>/gi);
+  for (const b of appBlocks) {
+    const block = b[1];
+    const status = getTag(block, 'LatestApplicationStatus');
+    if (!status) continue; // not yet applied to this finance house
+    financeApps.push({
+      companyName: getTag(block, 'CompanyName'),
+      status,
+      date: getTag(block, 'LatestApplicationDate'),
+    });
+  }
+
+  // Most recent by date (string ISO comparison works fine here)
+  financeApps.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  const latestFinanceApp = financeApps[0] || null;
+
   return {
-    FinanceStatus: getTag(xml, 'FinanceStatus'),
+    // Fallback to a top-level tag in case some responses do include it
+    FinanceStatus: getTag(xml, 'FinanceStatus') || latestFinanceApp?.status || null,
+    FinanceCompany: latestFinanceApp?.companyName || null,
     TransactionStatus: getTag(xml, 'TransactionStatus'),
     PolicyNumber: getTag(xml, 'PolicyNumber'),
   };
