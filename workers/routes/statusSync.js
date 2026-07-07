@@ -225,7 +225,24 @@ async function upsertPolicyStatus(env, { policyNumber, applicationStatus, financ
 // ---------- Edith SOAP calls ----------
 
 async function getPolicyStatusList(wsdlUrl, companyCode, companyPass, startDate) {
-  const xml = `<?xml version="1.0" encoding="utf-8"?>
+  const xml = buildStatusListXML(companyCode, companyPass, startDate);
+  const rawText = await soapFetch(wsdlUrl, xml, 'GetPolicyStatusList');
+  return parseStatusListXML(rawText);
+}
+
+// Browser-debuggable variant — returns the raw XML text directly instead of
+// parsing it, so it can be viewed in a browser tab with no terminal/log
+// access needed. Called from the /api/debug/raw-status-list route.
+export async function debugFetchStatusListXML(env) {
+  const lastRun = await getLastRunDate(env);
+  const { companyCode, companyPass, wsdlUrl } = selectEdithCredentials(env);
+  const xml = buildStatusListXML(companyCode, companyPass, lastRun);
+  const rawText = await soapFetch(wsdlUrl, xml, 'GetPolicyStatusList');
+  return { requestXml: xml, responseXml: rawText, startDate: lastRun };
+}
+
+function buildStatusListXML(companyCode, companyPass, startDate) {
+  return `<?xml version="1.0" encoding="utf-8"?>
 <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tem="http://ws.edith.co.za/EdithServices/PolicyServicesV300">
   <soap:Body>
     <tem:GetPolicyStatusList>
@@ -240,18 +257,6 @@ async function getPolicyStatusList(wsdlUrl, companyCode, companyPass, startDate)
     </tem:GetPolicyStatusList>
   </soap:Body>
 </soap:Envelope>`;
-
-  const rawText = await soapFetch(wsdlUrl, xml, 'GetPolicyStatusList');
-
-  // TEMP DEBUG LOGGING — remove once XML tag names are confirmed correct.
-  console.log(JSON.stringify({
-    level: 'info',
-    type: 'edith_status_list_raw_response',
-    rawText,
-    ts: new Date().toISOString(),
-  }));
-
-  return parseStatusListXML(rawText);
 }
 
 async function getPolicyDetails(wsdlUrl, companyCode, companyPass, policyNumber) {
