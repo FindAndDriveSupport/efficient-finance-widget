@@ -218,18 +218,23 @@ function formatEdithDate(date) {
 
 // ---------- D1 helpers (policy_events table) ----------
 
+const SQL_IN_BATCH_SIZE = 100; // stay well under SQLite's ~999 bound-parameter limit
+
 async function getExistingRows(env, policyNumbers) {
   const map = new Map();
   if (!policyNumbers.length) return map;
 
-  const placeholders = policyNumbers.map(() => '?').join(',');
-  const stmt = env.DB.prepare(
-    `SELECT id, policy_number, last_access_date FROM policy_events WHERE policy_number IN (${placeholders})`
-  ).bind(...policyNumbers);
+  for (let i = 0; i < policyNumbers.length; i += SQL_IN_BATCH_SIZE) {
+    const batch = policyNumbers.slice(i, i + SQL_IN_BATCH_SIZE);
+    const placeholders = batch.map(() => '?').join(',');
+    const stmt = env.DB.prepare(
+      `SELECT id, policy_number, last_access_date FROM policy_events WHERE policy_number IN (${placeholders})`
+    ).bind(...batch);
 
-  const { results } = await stmt.all();
-  for (const row of results) {
-    map.set(row.policy_number, row);
+    const { results } = await stmt.all();
+    for (const row of results) {
+      map.set(row.policy_number, row);
+    }
   }
   return map;
 }
