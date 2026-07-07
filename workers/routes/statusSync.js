@@ -260,7 +260,21 @@ function buildStatusListXML(companyCode, companyPass, startDate) {
 }
 
 async function getPolicyDetails(wsdlUrl, companyCode, companyPass, policyNumber) {
-  const xml = `<?xml version="1.0" encoding="utf-8"?>
+  const xml = buildPolicyDetailsXML(companyCode, companyPass, policyNumber);
+  const rawText = await soapFetch(wsdlUrl, xml, 'GetPolicyDetails');
+  return parsePolicyDetailsXML(rawText);
+}
+
+// Browser-debuggable variant — returns raw XML directly for inspection.
+export async function debugFetchPolicyDetailsXML(env, policyNumber) {
+  const { companyCode, companyPass, wsdlUrl } = selectEdithCredentials(env);
+  const xml = buildPolicyDetailsXML(companyCode, companyPass, policyNumber);
+  const rawText = await soapFetch(wsdlUrl, xml, 'GetPolicyDetails');
+  return { requestXml: xml, responseXml: rawText };
+}
+
+function buildPolicyDetailsXML(companyCode, companyPass, policyNumber) {
+  return `<?xml version="1.0" encoding="utf-8"?>
 <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tem="http://ws.edith.co.za/EdithServices/PolicyServicesV300">
   <soap:Body>
     <tem:GetPolicyDetails>
@@ -273,9 +287,6 @@ async function getPolicyDetails(wsdlUrl, companyCode, companyPass, policyNumber)
     </tem:GetPolicyDetails>
   </soap:Body>
 </soap:Envelope>`;
-
-  const rawText = await soapFetch(wsdlUrl, xml, 'GetPolicyDetails');
-  return parsePolicyDetailsXML(rawText);
 }
 
 async function soapFetch(wsdlUrl, xml, action) {
