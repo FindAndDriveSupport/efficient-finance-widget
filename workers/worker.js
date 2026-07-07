@@ -13,7 +13,7 @@ import { handleDealerConfig }    from './routes/dealerConfig.js';
 import { handleAddressSearch }   from './routes/addressSearch.js';
 import { handleGetPolicies }     from './routes/getPolicies.js';
 import { handleLookups }         from './routes/lookups.js';
-import { runStatusSync, debugFetchStatusListXML, debugFetchPolicyDetailsXML } from './routes/statusSync.js';
+import { runStatusSync, runFullBackfill, debugFetchStatusListXML, debugFetchPolicyDetailsXML } from './routes/statusSync.js';
 
 // ── CORS headers ──────────────────────────────────────────────
 
@@ -165,6 +165,21 @@ export default {
             headers: { 'Content-Type': 'text/plain; charset=utf-8', ...corsHeaders(origin, env) },
           });
         }
+      }
+
+      // ── TEMPORARY DEBUG ROUTE — trigger one-time historical backfill ──
+      // Catches up policies whose last Edith edit predates this sync system,
+      // which the daily incremental sync will never see (it only looks
+      // "since last run"). Safe to re-run — existing rows just get updated.
+      // Optional ?since=dd-mmm-yyyy HH:nn to override the default 2020 start.
+      if (path === '/api/debug/backfill-status' && method === 'GET') {
+        const key = url.searchParams.get('key');
+        if (!env.DEBUG_SYNC_KEY || key !== env.DEBUG_SYNC_KEY) {
+          return jsonResponse({ error: 'Not found' }, 404, origin, env);
+        }
+        const sinceDate = url.searchParams.get('since');
+        const result = sinceDate ? await runFullBackfill(env, sinceDate) : await runFullBackfill(env);
+        return jsonResponse(result, 200, origin, env);
       }
 
       return jsonResponse({ error: 'Not found' }, 404, origin, env);
