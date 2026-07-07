@@ -13,7 +13,7 @@ import { handleDealerConfig }    from './routes/dealerConfig.js';
 import { handleAddressSearch }   from './routes/addressSearch.js';
 import { handleGetPolicies }     from './routes/getPolicies.js';
 import { handleLookups }         from './routes/lookups.js';
-import { runStatusSync }         from './routes/statusSync.js';
+import { runStatusSync, debugFetchStatusListXML } from './routes/statusSync.js';
 
 // ── CORS headers ──────────────────────────────────────────────
 
@@ -116,6 +116,29 @@ export default {
         }
         const result = await runStatusSync(env);
         return jsonResponse(result, 200, origin, env);
+      }
+
+      // ── TEMPORARY DEBUG ROUTE — view raw Edith XML directly in browser ──
+      // Same key gate as above. Returns the raw SOAP request/response as
+      // plain text so it can be read on mobile with no terminal/log access.
+      if (path === '/api/debug/raw-status-list' && method === 'GET') {
+        const key = url.searchParams.get('key');
+        if (!env.DEBUG_SYNC_KEY || key !== env.DEBUG_SYNC_KEY) {
+          return jsonResponse({ error: 'Not found' }, 404, origin, env);
+        }
+        try {
+          const { requestXml, responseXml, startDate } = await debugFetchStatusListXML(env);
+          const text = `startDate used: ${startDate}\n\n--- REQUEST XML ---\n${requestXml}\n\n--- RESPONSE XML ---\n${responseXml}`;
+          return new Response(text, {
+            status: 200,
+            headers: { 'Content-Type': 'text/plain; charset=utf-8', ...corsHeaders(origin, env) },
+          });
+        } catch (err) {
+          return new Response(`Error calling Edith: ${err.message}`, {
+            status: 500,
+            headers: { 'Content-Type': 'text/plain; charset=utf-8', ...corsHeaders(origin, env) },
+          });
+        }
       }
 
       return jsonResponse({ error: 'Not found' }, 404, origin, env);
