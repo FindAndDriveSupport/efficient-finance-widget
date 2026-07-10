@@ -113,16 +113,15 @@ async function processStatusSync(env, startDate) {
   const policyNumbers = statusList.map((p) => p.PolicyNumber).filter(Boolean);
   const existingRows = await getExistingRows(env, policyNumbers);
 
-  // Only sync policies that already have a row in policy_events — since the
-  // insert path was removed, any existing row can only have come from
-  // createPolicy.js (the widget), so mere existence is sufficient proof of
-  // origin. NB: we deliberately do NOT also require applicant_id to be
-  // non-null here — that field is optional at intake (createPolicy.js sets
-  // it from body.applicantId || null), so a real widget deal can
-  // legitimately have a null applicant_id. Gating on it would silently
-  // skip genuine widget deals forever.
+  // Only sync policies that originated in the widget (i.e. already have a
+  // row with a non-null applicant_id). Anything created directly in Edith,
+  // outside the widget, has no way to be tied to a dealer/applicant here —
+  // skip it entirely rather than inserting a partial/unlinked row.
   const beforeOwnershipFilter = statusList.length;
-  statusList = statusList.filter((entry) => existingRows.has(entry.PolicyNumber));
+  statusList = statusList.filter((entry) => {
+    const existing = existingRows.get(entry.PolicyNumber);
+    return existing && existing.applicant_id != null;
+  });
   const skippedNonWidgetCount = beforeOwnershipFilter - statusList.length;
   if (skippedNonWidgetCount > 0) {
     console.log(JSON.stringify({
@@ -331,7 +330,7 @@ async function upsertPolicyStatus(env, {
   values.push(policyNumber);
 
   const result = await env.DB.prepare(
-    `UPDATE policy_events SET ${sets.join(', ')} WHERE policy_number = ?`
+    `UPDATE policy_events SET ${sets.join(', ')} WHERE policy_number = ? AND applicant_id IS NOT NULL`
   ).bind(...values).run();
 
   return result.meta.changes > 0 ? 'updated' : 'skipped';
@@ -348,12 +347,12 @@ async function getPolicyStatusList(wsdlUrl, companyCode, companyPass, startDate)
 // Browser-debuggable variant — returns the raw XML text directly instead of
 // parsing it, so it can be viewed in a browser tab with no terminal/log
 // access needed. Called from the /api/debug/raw-status-list route.
-export async function debugFetchStatusListXML(env, sinceDateOverride) {
-  const startDate = sinceDateOverride || await getLastRunDate(env);
+export async function debugFetchStatusListXML(env) {
+  const lastRun = await getLastRunDate(env);
   const { companyCode, companyPass, wsdlUrl } = selectEdithCredentials(env);
-  const xml = buildStatusListXML(companyCode, companyPass, startDate);
+  const xml = buildStatusListXML(companyCode, companyPass, lastRun);
   const rawText = await soapFetch(wsdlUrl, xml, 'GetPolicyStatusList');
-  return { requestXml: xml, responseXml: rawText, startDate };
+  return { requestXml: xml, responseXml: rawText, startDate: lastRun };
 }
 
 function buildStatusListXML(companyCode, companyPass, startDate) {
@@ -513,11 +512,7 @@ function parsePolicyDetailsXML(xml) {
 
 function getTag(xml, tag) {
   const match = xml.match(new RegExp(`<[^>]*${tag}[^>]*>([^<]*)<`, 'i'));
-  if (!match) return null;
-  const value = match[1].trim();
-  // Self-closing nil tags (e.g. <RetailPrice xsi:nil="true" />) match with
-  // an empty capture group — treat that the same as "tag not present".
-  return value === '' ? null : value;
+  return match ? match[1].trim() : null;
 }
 
 // ---------- Shared helpers ----------

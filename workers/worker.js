@@ -121,16 +121,13 @@ export default {
       // ── TEMPORARY DEBUG ROUTE — view raw Edith XML directly in browser ──
       // Same key gate as above. Returns the raw SOAP request/response as
       // plain text so it can be read on mobile with no terminal/log access.
-      // Optional ?since=dd-mmm-yyyy HH:nn to override the default "last run"
-      // window — e.g. to inspect exactly what a backfill call would see.
       if (path === '/api/debug/raw-status-list' && method === 'GET') {
         const key = url.searchParams.get('key');
         if (!env.DEBUG_SYNC_KEY || key !== env.DEBUG_SYNC_KEY) {
           return jsonResponse({ error: 'Not found' }, 404, origin, env);
         }
         try {
-          const sinceOverride = url.searchParams.get('since') || undefined;
-          const { requestXml, responseXml, startDate } = await debugFetchStatusListXML(env, sinceOverride);
+          const { requestXml, responseXml, startDate } = await debugFetchStatusListXML(env);
           const text = `startDate used: ${startDate}\n\n--- REQUEST XML ---\n${requestXml}\n\n--- RESPONSE XML ---\n${responseXml}`;
           return new Response(text, {
             status: 200,
