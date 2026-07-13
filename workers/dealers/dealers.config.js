@@ -198,6 +198,32 @@ export const DEALERS = {
       vehicleQueryParams: true,
     },
   },
+
+  'byd-pietermaritzburg': {
+    name: 'BYD Pietermaritzburg',
+    branchCode: 'ALPI043',
+    financeType: 'vehicle',
+    edithEnv: 'prod',
+    contactEmail: 'MICHELEV@ALPINEMOTORS.CO.ZA',
+    billingType: 'transaction',
+    groupKey: 'Alpine Motors',
+    allowedDomains: [
+      'https://bydkzn.co.za/',
+      'byd-pietermaritzburg.seritifinance.findndrive.co.za',
+      'seritifinance.findndrive.co.za',
+    ],
+    theme: {
+      primary: '#5d6e73',
+      gradient: 'linear-gradient(135deg, #5d6e73 0%, #5d6e73 100%)',
+      fontFamily: "'Inter', sans-serif",
+      borderRadius: '12px',
+    },
+    features: {
+      showDeposit: true,
+      showCurrentFinance: true,
+      vehicleQueryParams: true,
+    },
+  },
   // ─────────────────────────────────────────────────────────────
   // ADD MORE DEALERS BELOW — copy a block, change the values
   // ─────────────────────────────────────────────────────────────
