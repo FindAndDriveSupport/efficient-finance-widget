@@ -762,6 +762,33 @@ export const DEALERS = {
       showVehicleSelection: true,
     },
   },
+
+  'vw-hillcrest': {
+    name: 'VW Hillcrest',
+    branchCode: 'ALPI021',
+    financeType: 'vehicle',
+    edithEnv: 'prod',
+    contactEmail: 'PAMMYG@ALPINEMOTORS.CO.ZA',
+    billingType: 'transaction',
+    groupKey: 'Alpine Motors',
+    allowedDomains: [
+      'https://www.hillcrestvw.co.za/',
+      'vw-hillcrest.seritifinance.findndrive.co.za',
+      'seritifinance.findndrive.co.za',
+    ],
+    theme: {
+      primary: '#5d6e73',
+      gradient: 'linear-gradient(135deg, #5d6e73 0%, #5d6e73 100%)',
+      fontFamily: "'Inter', sans-serif",
+      borderRadius: '12px',
+    },
+    features: {
+      showDeposit: true,
+      showCurrentFinance: true,
+      vehicleQueryParams: true,
+      showVehicleSelection: true,
+    },
+  },
   // ─────────────────────────────────────────────────────────────
   // ADD MORE DEALERS BELOW — copy a block, change the values
   // ─────────────────────────────────────────────────────────────
