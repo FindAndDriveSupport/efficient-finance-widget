@@ -153,7 +153,7 @@ export const DEALERS = {
     financeType: 'vehicle',
     edithEnv: 'prod',
     contactEmail: 'RIAANM@ALPINEMOTORS.CO.ZA',
-    billingType: 'transaction',
+    billingType: 'fixed',
     groupKey: 'Alpine Motors',
     allowedDomains: [
       'https://bydkzn.co.za/',
@@ -179,7 +179,7 @@ export const DEALERS = {
     financeType: 'vehicle',
     edithEnv: 'prod',
     contactEmail: 'MICHELEV@ALPINEMOTORS.CO.ZA',
-    billingType: 'transaction',
+    billingType: 'fixed',
     groupKey: 'Alpine Motors',
     allowedDomains: [
       'https://bydkzn.co.za/',
@@ -205,7 +205,7 @@ export const DEALERS = {
     financeType: 'vehicle',
     edithEnv: 'prod',
     contactEmail: 'MICHELEV@ALPINEMOTORS.CO.ZA',
-    billingType: 'transaction',
+    billingType: 'fixed',
     groupKey: 'Alpine Motors',
     allowedDomains: [
       'https://bydkzn.co.za/',
@@ -231,7 +231,7 @@ export const DEALERS = {
     financeType: 'vehicle',
     edithEnv: 'prod',
     contactEmail: 'ANNELINEB@ALPINEMOTORS.CO.ZA',
-    billingType: 'transaction',
+    billingType: 'fixed',
     groupKey: 'Alpine Motors',
     allowedDomains: [
       'https://www.gwmhillcrest.co.za/',
@@ -257,7 +257,7 @@ export const DEALERS = {
     financeType: 'vehicle',
     edithEnv: 'prod',
     contactEmail: 'TENEILC@ALPINEMOTORS.CO.ZA',
-    billingType: 'transaction',
+    billingType: 'fixed',
     groupKey: 'Alpine Motors',
     allowedDomains: [
       'https://www.omodajaecoopinetown.co.za/',
@@ -283,7 +283,7 @@ export const DEALERS = {
     financeType: 'vehicle',
     edithEnv: 'prod',
     contactEmail: 'mariuss@alpinemotors.co.za',
-    billingType: 'transaction',
+    billingType: 'fixed',
     groupKey: 'Alpine Motors',
     allowedDomains: [
       'https://www.baicballito.co.za/',
@@ -310,7 +310,7 @@ export const DEALERS = {
     financeType: 'vehicle',
     edithEnv: 'prod',
     contactEmail: 'lauram@alpinemotors.co.za',
-    billingType: 'transaction',
+    billingType: 'fixed',
     groupKey: 'Alpine Motors',
     allowedDomains: [
       'https://www.baicpinetown.co.za/',
@@ -337,7 +337,7 @@ export const DEALERS = {
     financeType: 'vehicle',
     edithEnv: 'prod',
     contactEmail: 'mackneyn@alpinemotors.co.za',
-    billingType: 'transaction',
+    billingType: 'fixed',
     groupKey: 'Alpine Motors',
     allowedDomains: [
       'https://www.baic-umhlanga.co.za/',
@@ -364,7 +364,7 @@ export const DEALERS = {
     financeType: 'vehicle',
     edithEnv: 'prod',
     contactEmail: 'mariuss@alpinemotors.co.za',
-    billingType: 'transaction',
+    billingType: 'fixed',
     groupKey: 'Alpine Motors',
     allowedDomains: [
       'https://bydkzn.co.za/',
@@ -391,7 +391,7 @@ export const DEALERS = {
     financeType: 'vehicle',
     edithEnv: 'prod',
     contactEmail: 'kevinb@alpinemotors.co.za',
-    billingType: 'transaction',
+    billingType: 'fixed',
     groupKey: 'Alpine Motors',
     allowedDomains: [
       'https://bydkzn.co.za/',
@@ -418,7 +418,7 @@ export const DEALERS = {
     financeType: 'vehicle',
     edithEnv: 'prod',
     contactEmail: 'mariuss@alpinemotors.co.za',
-    billingType: 'transaction',
+    billingType: 'fixed',
     groupKey: 'Alpine Motors',
     allowedDomains: [
       'https://www.jetouralpine.co.za/',
@@ -445,7 +445,7 @@ export const DEALERS = {
     financeType: 'vehicle',
     edithEnv: 'prod',
     contactEmail: 'kenp@alpinemotors.co.za',
-    billingType: 'transaction',
+    billingType: 'fixed',
     groupKey: 'Alpine Motors',
     allowedDomains: [
       'https://www.jetouralpine.co.za',
@@ -472,7 +472,7 @@ export const DEALERS = {
     financeType: 'vehicle',
     edithEnv: 'prod',
     contactEmail: 'darrenvn@alpinemotors.co.za',
-    billingType: 'transaction',
+    billingType: 'fixed',
     groupKey: 'Alpine Motors',
     allowedDomains: [
       'https://www.jetouralpine.co.za',
@@ -499,7 +499,7 @@ export const DEALERS = {
     financeType: 'vehicle',
     edithEnv: 'prod',
     contactEmail: 'joashd@alpinemotors.co.za',
-    billingType: 'transaction',
+    billingType: 'fixed',
     groupKey: 'Alpine Motors',
     allowedDomains: [
       'https://www.renaulthillcrest.co.za/',
@@ -526,7 +526,7 @@ export const DEALERS = {
     financeType: 'vehicle',
     edithEnv: 'prod',
     contactEmail: 'justin@allcarspinetown.co.za',
-    billingType: 'transaction',
+    billingType: 'fixed',
     groupKey: 'Alpine Motors',
     allowedDomains: [
       'https://allcarspinetown.com/',
@@ -553,7 +553,7 @@ export const DEALERS = {
     financeType: 'vehicle',
     edithEnv: 'prod',
     contactEmail: 'mariuss@alpinemotors.co.za',
-    billingType: 'transaction',
+    billingType: 'fixed',
     groupKey: 'Alpine Motors',
     allowedDomains: [
       'https://www.alpinecarsballito.co.za/',
@@ -580,7 +580,7 @@ export const DEALERS = {
     financeType: 'vehicle',
     edithEnv: 'prod',
     contactEmail: 'kevinb@alpinemotors.co.za',
-    billingType: 'transaction',
+    billingType: 'fixed',
     groupKey: 'Alpine Motors',
     allowedDomains: [
       'https://commercial.alpinemotors.co.za/',
@@ -607,7 +607,7 @@ export const DEALERS = {
     financeType: 'vehicle',
     edithEnv: 'prod',
     contactEmail: 'cuan@alpinemotors.co.za',
-    billingType: 'transaction',
+    billingType: 'fixed',
     groupKey: 'Alpine Motors',
     allowedDomains: [
       'https://www.audicentrepinetown.co.za/',
@@ -634,7 +634,7 @@ export const DEALERS = {
     financeType: 'vehicle',
     edithEnv: 'prod',
     contactEmail: 'REDDYR@VWFS.CO.ZA',
-    billingType: 'transaction',
+    billingType: 'fixed',
     groupKey: 'Alpine Motors',
     allowedDomains: [
       'https://www.audi-umhlanga.co.za/',
@@ -661,7 +661,7 @@ export const DEALERS = {
     financeType: 'vehicle',
     edithEnv: 'prod',
     contactEmail: 'GEORGEN@ALPINEMOTORS.CO.ZA',
-    billingType: 'transaction',
+    billingType: 'fixed',
     groupKey: 'Alpine Motors',
     allowedDomains: [
       'https://www.cherydurban.co.za/',
@@ -688,7 +688,7 @@ export const DEALERS = {
     financeType: 'vehicle',
     edithEnv: 'prod',
     contactEmail: 'kevinb@alpinemotors.co.za',
-    billingType: 'transaction',
+    billingType: 'fixed',
     groupKey: 'Alpine Motors',
     allowedDomains: [
       'https://www.cherypinetown.co.za/',
@@ -715,7 +715,7 @@ export const DEALERS = {
     financeType: 'vehicle',
     edithEnv: 'prod',
     contactEmail: 'kevinb@alpinemotors.co.za',
-    billingType: 'transaction',
+    billingType: 'fixed',
     groupKey: 'Alpine Motors',
     allowedDomains: [
       'https://www.icaurpinetown.co.za/',
@@ -742,7 +742,7 @@ export const DEALERS = {
     financeType: 'vehicle',
     edithEnv: 'prod',
     contactEmail: 'kevinb@alpinemotors.co.za',
-    billingType: 'transaction',
+    billingType: 'fixed',
     groupKey: 'Alpine Motors',
     allowedDomains: [
       'https://www.lepaspinetown.co.za/',
@@ -769,7 +769,7 @@ export const DEALERS = {
     financeType: 'vehicle',
     edithEnv: 'prod',
     contactEmail: 'PAMMYG@ALPINEMOTORS.CO.ZA',
-    billingType: 'transaction',
+    billingType: 'fixed',
     groupKey: 'Alpine Motors',
     allowedDomains: [
       'https://www.hillcrestvw.co.za/',
@@ -796,7 +796,7 @@ export const DEALERS = {
     financeType: 'vehicle',
     edithEnv: 'prod',
     contactEmail: 'lauram@alpinemotors.co.za',
-    billingType: 'transaction',
+    billingType: 'fixed',
     groupKey: 'Alpine Motors',
     allowedDomains: [
       'https://volkswagen.alpinemotors.co.za/',
@@ -823,7 +823,7 @@ export const DEALERS = {
     financeType: 'vehicle',
     edithEnv: 'prod',
     contactEmail: 'joashd@alpinemotors.co.za',
-    billingType: 'transaction',
+    billingType: 'fixed',
     groupKey: 'Alpine Motors',
     allowedDomains: [
       'https://www.jetouralpine.co.za/',
