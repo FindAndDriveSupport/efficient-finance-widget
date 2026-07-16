@@ -633,7 +633,7 @@ export const DEALERS = {
     branchCode: 'ALPI020',
     financeType: 'vehicle',
     edithEnv: 'prod',
-    contactEmail: 'dineshino@alpinemotors.co.za',
+    contactEmail: 'REDDYR@VWFS.CO.ZA',
     billingType: 'transaction',
     groupKey: 'Alpine Motors',
     allowedDomains: [
