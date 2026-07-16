@@ -573,6 +573,33 @@ export const DEALERS = {
       showVehicleSelection: true,
     },
   },
+
+  'alpine-commercial': {
+    name: 'Alpine Commercial',
+    branchCode: 'ALPI018',
+    financeType: 'vehicle',
+    edithEnv: 'prod',
+    contactEmail: 'kevinb@alpinemotors.co.za',
+    billingType: 'transaction',
+    groupKey: 'Alpine Motors',
+    allowedDomains: [
+      'https://commercial.alpinemotors.co.za/',
+      'alpine-commercial.seritifinance.findndrive.co.za',
+      'seritifinance.findndrive.co.za',
+    ],
+    theme: {
+      primary: '#5d6e73',
+      gradient: 'linear-gradient(135deg, #5d6e73 0%, #5d6e73 100%)',
+      fontFamily: "'Inter', sans-serif",
+      borderRadius: '12px',
+    },
+    features: {
+      showDeposit: true,
+      showCurrentFinance: true,
+      vehicleQueryParams: true,
+      showVehicleSelection: true,
+    },
+  },
   // ─────────────────────────────────────────────────────────────
   // ADD MORE DEALERS BELOW — copy a block, change the values
   // ─────────────────────────────────────────────────────────────
