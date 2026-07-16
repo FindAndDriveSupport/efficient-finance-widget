@@ -444,7 +444,7 @@ export const DEALERS = {
     branchCode: 'ALPI038',
     financeType: 'vehicle',
     edithEnv: 'prod',
-    contactEmail: 'mariuss@alpinemotors.co.za',
+    contactEmail: 'kenp@alpinemotors.co.za',
     billingType: 'transaction',
     groupKey: 'Alpine Motors',
     allowedDomains: [
