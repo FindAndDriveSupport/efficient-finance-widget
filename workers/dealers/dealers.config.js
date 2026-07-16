@@ -816,6 +816,33 @@ export const DEALERS = {
       showVehicleSelection: true,
     },
   },
+
+  'jetour-hillcrest': {
+    name: 'Jetour Hillcrest',
+    branchCode: 'ALPI045',
+    financeType: 'vehicle',
+    edithEnv: 'prod',
+    contactEmail: 'joashd@alpinemotors.co.za',
+    billingType: 'transaction',
+    groupKey: 'Alpine Motors',
+    allowedDomains: [
+      'https://www.jetouralpine.co.za/',
+      'jetour-hillcrest.seritifinance.findndrive.co.za',
+      'seritifinance.findndrive.co.za',
+    ],
+    theme: {
+      primary: '#5d6e73',
+      gradient: 'linear-gradient(135deg, #5d6e73 0%, #5d6e73 100%)',
+      fontFamily: "'Inter', sans-serif",
+      borderRadius: '12px',
+    },
+    features: {
+      showDeposit: true,
+      showCurrentFinance: true,
+      vehicleQueryParams: true,
+      showVehicleSelection: true,
+    },
+  },
   // ─────────────────────────────────────────────────────────────
   // ADD MORE DEALERS BELOW — copy a block, change the values
   // ─────────────────────────────────────────────────────────────
