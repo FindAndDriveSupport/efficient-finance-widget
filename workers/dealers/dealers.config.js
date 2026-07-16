@@ -529,7 +529,7 @@ export const DEALERS = {
     billingType: 'transaction',
     groupKey: 'Alpine Motors',
     allowedDomains: [
-      'https://www.alpinecarsballito.co.za/',
+      'https://allcarspinetown.com/',
       'all-cars-pinetown.seritifinance.findndrive.co.za',
       'seritifinance.findndrive.co.za',
     ],
