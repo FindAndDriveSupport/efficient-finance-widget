@@ -589,7 +589,7 @@ export const DEALERS = {
       'seritifinance.findndrive.co.za',
     ],
     theme: {
-      primary: '#5d6e73',
+      primary: '#001d51',
       gradient: 'linear-gradient(135deg, #5d6e73 0%, #5d6e73 100%)',
       fontFamily: "'Inter', sans-serif",
       borderRadius: '12px',
@@ -778,7 +778,7 @@ export const DEALERS = {
       'seritifinance.findndrive.co.za',
     ],
     theme: {
-      primary: '#5d6e73',
+      primary: '#001d51',
       gradient: 'linear-gradient(135deg, #5d6e73 0%, #5d6e73 100%)',
       fontFamily: "'Inter', sans-serif",
       borderRadius: '12px',
@@ -805,7 +805,7 @@ export const DEALERS = {
       'seritifinance.findndrive.co.za',
     ],
     theme: {
-      primary: '#5d6e73',
+      primary: '#001d51',
       gradient: 'linear-gradient(135deg, #5d6e73 0%, #5d6e73 100%)',
       fontFamily: "'Inter', sans-serif",
       borderRadius: '12px',
