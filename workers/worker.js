@@ -3,7 +3,7 @@
  * Cloudflare Worker: API proxy, auth, CORS, dealer routing
  */
 
-import { isOriginAllowed, getDealerConfig } from './dealers/dealers.config.js';
+import { isOriginAllowed, getDealerConfig, getDealerByBranchCode } from './dealers/dealers.config.js';
 import { handlePreQual }         from './routes/preQual.js';
 import { handlePrediction }      from './routes/prediction.js';
 import { handleGetApplicant }    from './routes/getApplicant.js';
@@ -64,10 +64,24 @@ export default {
     const dealerKey    = request.headers.get('X-Dealer-Key') || url.searchParams.get('dealer');
     const dealerConfig = getDealerConfig(dealerKey, origin);
 
-    // Allow branch code override via query param — for multi-branch dealer groups
+    // Allow branch code override via query param — for multi-branch dealer
+    // groups (e.g. Alpine Motors, where each branch has its own dealerConfig
+    // entry and its own Seriti dealershipID). branchCode and dealershipID
+    // must always travel together: if the override resolves to a known
+    // dealer entry, sync both fields from that entry so the pair sent to
+    // Seriti is never mismatched. If the override doesn't match any known
+    // branch, keep the raw branchCode override but drop dealershipID rather
+    // than risk sending a stale ID for the wrong branch.
     const branchOverride = url.searchParams.get('branchCode');
     if (branchOverride && /^[A-Z0-9]{4,12}$/.test(branchOverride)) {
-      dealerConfig.branchCode = branchOverride;
+      const overrideDealer = getDealerByBranchCode(branchOverride);
+      if (overrideDealer) {
+        dealerConfig.branchCode  = overrideDealer.branchCode;
+        dealerConfig.dealershipID = overrideDealer.dealershipID;
+      } else {
+        dealerConfig.branchCode  = branchOverride;
+        dealerConfig.dealershipID = undefined;
+      }
     }
 
     // Inject env + dealerConfig into a context object
