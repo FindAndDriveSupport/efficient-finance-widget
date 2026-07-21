@@ -22,6 +22,10 @@
  *     group the identical groupKey string. Used by billing-worker to roll
  *     up group members into one invoice line, and by the analytics
  *     dashboard to aggregate metrics across the group.
+ *   - dealershipID (optional — Seriti's carFinanceDealershipBranchId GUID.
+ *     Sourced from Seriti's dealership-branch export, matched here by
+ *     branchCode. Consumed by preQual.js: if present, it's included as
+ *     `dealershipID` in the Seriti pre-qualification payload.)
  */
 
 export const DEALERS = {
@@ -150,6 +154,7 @@ export const DEALERS = {
   'byd-durban': {
     name: 'BYD Durban',
     branchCode: 'ALPI041',
+    dealershipID: 'bfc0d451-669b-4d64-8032-830a3eb7e5d8',
     financeType: 'vehicle',
     edithEnv: 'prod',
     contactEmail: 'RIAANM@ALPINEMOTORS.CO.ZA',
@@ -176,6 +181,7 @@ export const DEALERS = {
   'byd-hillcrest': {
     name: 'BYD Hillcrest',
     branchCode: 'ALPI042',
+    dealershipID: '2d7ef322-8808-405f-af5b-ccf9c70fe289',
     financeType: 'vehicle',
     edithEnv: 'prod',
     contactEmail: 'MICHELEV@ALPINEMOTORS.CO.ZA',
@@ -202,6 +208,7 @@ export const DEALERS = {
   'byd-pietermaritzburg': {
     name: 'BYD Pietermaritzburg',
     branchCode: 'ALPI043',
+    dealershipID: '8275af4b-a4d2-4c4c-86a8-ec628e9e1d1a',
     financeType: 'vehicle',
     edithEnv: 'prod',
     contactEmail: 'MICHELEV@ALPINEMOTORS.CO.ZA',
@@ -228,6 +235,7 @@ export const DEALERS = {
   'gwm-hillcrest': {
     name: 'GWM Hillcrest',
     branchCode: 'ALPI024',
+    dealershipID: '23453d6f-0487-4109-a16c-10111dfb230f',
     financeType: 'vehicle',
     edithEnv: 'prod',
     contactEmail: 'ANNELINEB@ALPINEMOTORS.CO.ZA',
@@ -254,6 +262,7 @@ export const DEALERS = {
   'omoda-jaecoo-pinetown': {
     name: 'Omoda Jaecoo Pinetown',
     branchCode: 'ALPI029',
+    dealershipID: 'b38e3393-7da9-4a31-85c1-4e14973b15ac',
     financeType: 'vehicle',
     edithEnv: 'prod',
     contactEmail: 'TENEILC@ALPINEMOTORS.CO.ZA',
@@ -281,6 +290,7 @@ export const DEALERS = {
   'baic-ballito': {
     name: 'BAIC Ballito',
     branchCode: 'ALPI035',
+    dealershipID: '322da0c7-378b-40cc-a461-94b44d5e5828',
     financeType: 'vehicle',
     edithEnv: 'prod',
     contactEmail: 'mariuss@alpinemotors.co.za',
@@ -308,6 +318,7 @@ export const DEALERS = {
   'baic-pinetown': {
     name: 'BAIC Pinetown',
     branchCode: 'ALPI026',
+    dealershipID: '755069cf-f25a-42c3-ba29-53e9d671a64b',
     financeType: 'vehicle',
     edithEnv: 'prod',
     contactEmail: 'lauram@alpinemotors.co.za',
@@ -335,6 +346,7 @@ export const DEALERS = {
   'baic-umhlanga': {
     name: 'BAIC Umhlanga',
     branchCode: 'ALPI027',
+    dealershipID: 'be300912-91ae-4473-b2fa-b4f8d98dcb63',
     financeType: 'vehicle',
     edithEnv: 'prod',
     contactEmail: 'mackneyn@alpinemotors.co.za',
@@ -362,6 +374,7 @@ export const DEALERS = {
   'byd-ballito': {
     name: 'BYD Ballito',
     branchCode: 'ALPI034',
+    dealershipID: '2512b85b-87c0-45bf-84b1-66391e21f2a4',
     financeType: 'vehicle',
     edithEnv: 'prod',
     contactEmail: 'mariuss@alpinemotors.co.za',
@@ -389,6 +402,7 @@ export const DEALERS = {
   'byd-pinetown': {
     name: 'BYD Pinetown',
     branchCode: 'ALPI033',
+    dealershipID: '7b9dd21f-4996-4592-844b-426127ace3c4',
     financeType: 'vehicle',
     edithEnv: 'prod',
     contactEmail: 'kevinb@alpinemotors.co.za',
@@ -416,6 +430,7 @@ export const DEALERS = {
   'jetour-ballito': {
     name: 'JETOUR Ballito',
     branchCode: 'ALPI040',
+    dealershipID: '86f319d6-f2a0-4797-b1fb-9dc3c968c4a7',
     financeType: 'vehicle',
     edithEnv: 'prod',
     contactEmail: 'mariuss@alpinemotors.co.za',
@@ -443,6 +458,7 @@ export const DEALERS = {
   'jetour-pinetown': {
     name: 'JETOUR Pinetown',
     branchCode: 'ALPI038',
+    dealershipID: '7591422b-4352-496c-b84a-8354983c319b',
     financeType: 'vehicle',
     edithEnv: 'prod',
     contactEmail: 'kenp@alpinemotors.co.za',
@@ -470,6 +486,7 @@ export const DEALERS = {
   'jetour-umhlanga': {
     name: 'JETOUR Umhlanga',
     branchCode: 'ALPI039',
+    dealershipID: 'b724a94e-3fe5-4d52-899d-ec9916b29c55',
     financeType: 'vehicle',
     edithEnv: 'prod',
     contactEmail: 'darrenvn@alpinemotors.co.za',
@@ -497,6 +514,7 @@ export const DEALERS = {
   'renault-hillcrest': {
     name: 'Renault Hillcrest',
     branchCode: 'ALPI023',
+    dealershipID: '6a37d438-deee-42da-befb-900e2cd739fb',
     financeType: 'vehicle',
     edithEnv: 'prod',
     contactEmail: 'joashd@alpinemotors.co.za',
@@ -524,6 +542,7 @@ export const DEALERS = {
   'all-cars-pinetown': {
     name: 'All Cars Pinetown',
     branchCode: 'ALPI030',
+    dealershipID: '2ae9f33f-d06c-40d1-84e2-611912e6d773',
     financeType: 'vehicle',
     edithEnv: 'prod',
     contactEmail: 'justin@allcarspinetown.co.za',
@@ -551,6 +570,7 @@ export const DEALERS = {
   'alpine-cars': {
     name: 'Alpine Cars',
     branchCode: 'ALPI031',
+    dealershipID: 'd7b37eea-bd71-45ba-8dbc-259d9251f74b',
     financeType: 'vehicle',
     edithEnv: 'prod',
     contactEmail: 'mariuss@alpinemotors.co.za',
@@ -578,6 +598,7 @@ export const DEALERS = {
   'alpine-commercial': {
     name: 'Alpine Commercial',
     branchCode: 'ALPI018',
+    dealershipID: 'a3f7320e-8d26-4bb9-b29f-ac04216c7aee',
     financeType: 'vehicle',
     edithEnv: 'prod',
     contactEmail: 'kevinb@alpinemotors.co.za',
@@ -605,6 +626,7 @@ export const DEALERS = {
   'audi-pinetown': {
     name: 'Audi Pinetown',
     branchCode: 'ALPI016',
+    dealershipID: '36f69e59-38c9-4f1e-9b26-8847c39cac96',
     financeType: 'vehicle',
     edithEnv: 'prod',
     contactEmail: 'cuan@alpinemotors.co.za',
@@ -632,6 +654,7 @@ export const DEALERS = {
   'audi-umhlanga': {
     name: 'Audi Umhlanga',
     branchCode: 'ALPI020',
+    dealershipID: '78a59284-7e78-49f3-a440-323666013e21',
     financeType: 'vehicle',
     edithEnv: 'prod',
     contactEmail: 'REDDYR@VWFS.CO.ZA',
@@ -659,6 +682,7 @@ export const DEALERS = {
   'chery-durban': {
     name: 'Chery Durban',
     branchCode: 'ALPI037',
+    dealershipID: '806be69f-7ec1-4965-9034-61cba47dede6',
     financeType: 'vehicle',
     edithEnv: 'prod',
     contactEmail: 'GEORGEN@ALPINEMOTORS.CO.ZA',
@@ -686,6 +710,7 @@ export const DEALERS = {
   'chery-pinetown': {
     name: 'Chery Pinetown',
     branchCode: 'ALPI025',
+    dealershipID: '639399ae-b73d-421c-9c23-c1bdd4b79e9b',
     financeType: 'vehicle',
     edithEnv: 'prod',
     contactEmail: 'kevinb@alpinemotors.co.za',
@@ -713,6 +738,7 @@ export const DEALERS = {
   'icaur-pinetown': {
     name: 'Icaur Pinetown',
     branchCode: 'ALPI046',
+    dealershipID: '11bf170a-10d6-44ba-86fd-b69f646c95c9',
     financeType: 'vehicle',
     edithEnv: 'prod',
     contactEmail: 'kevinb@alpinemotors.co.za',
@@ -740,6 +766,7 @@ export const DEALERS = {
   'lepas-pinetown': {
     name: 'Lepas Pinetown',
     branchCode: 'ALPI044',
+    dealershipID: '7a5d6b4c-5a41-4bee-bcf2-e70ad35dca69',
     financeType: 'vehicle',
     edithEnv: 'prod',
     contactEmail: 'kevinb@alpinemotors.co.za',
@@ -767,6 +794,7 @@ export const DEALERS = {
   'vw-hillcrest': {
     name: 'VW Hillcrest',
     branchCode: 'ALPI021',
+    dealershipID: 'f574e15b-1f8e-481a-b656-b060d013f2ac',
     financeType: 'vehicle',
     edithEnv: 'prod',
     contactEmail: 'PAMMYG@ALPINEMOTORS.CO.ZA',
@@ -794,6 +822,7 @@ export const DEALERS = {
   'vw-pinetown': {
     name: 'VW Pinetown',
     branchCode: 'ALPI017',
+    dealershipID: '36595225-2a8d-4ea8-b045-d4075a889692',
     financeType: 'vehicle',
     edithEnv: 'prod',
     contactEmail: 'lauram@alpinemotors.co.za',
@@ -821,6 +850,7 @@ export const DEALERS = {
   'jetour-hillcrest': {
     name: 'Jetour Hillcrest',
     branchCode: 'ALPI045',
+    dealershipID: 'e9013b2e-fdf8-4954-b4d1-0a20fce3fc9e',
     financeType: 'vehicle',
     edithEnv: 'prod',
     contactEmail: 'joashd@alpinemotors.co.za',
@@ -848,6 +878,7 @@ export const DEALERS = {
   'byd-umhlanga': {
     name: 'BYD Umhlanga',
     branchCode: 'ALPI032',
+    dealershipID: '7cd1d4dc-5975-462d-b29d-fbe84c05c4f3',
     financeType: 'vehicle',
     edithEnv: 'prod',
     contactEmail: 'mackneyn@alpinemotors.co.za',
