@@ -986,6 +986,34 @@ export const DEALERS = {
       showVehicleSelection: true,
     },
   },
+
+  'mahindra-rustenburg': {
+    name: 'Mahindra Rustenburg',
+    branchCode: 'VDW001',
+    dealershipID: 'a6ae4792-3b5c-40d6-ae1c-5f91dddb0a8a',
+    financeType: 'vehicle',
+    edithEnv: 'prod',
+    contactEmail: 'debbie@pmgrp.co.za',
+    billingType: 'fixed',
+    groupKey: 'Platina Motor Group',
+    allowedDomains: [
+      'https://www.mahindrarustenburg.co.za/',
+      'mahindra-rustenburg.seritifinance.findndrive.co.za',
+      'seritifinance.findndrive.co.za',
+    ],
+    theme: {
+      primary: '#e00f2f',
+      gradient: 'linear-gradient(135deg, #e00f2f 0%, #e00f2f 100%)',
+      fontFamily: "'Inter', sans-serif",
+      borderRadius: '12px',
+    },
+    features: {
+      showDeposit: true,
+      showCurrentFinance: true,
+      vehicleQueryParams: true,
+      showVehicleSelection: true,
+    },
+  },
   // ─────────────────────────────────────────────────────────────
   // ADD MORE DEALERS BELOW — copy a block, change the values
   // ─────────────────────────────────────────────────────────────
