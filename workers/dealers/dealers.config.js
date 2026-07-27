@@ -902,6 +902,34 @@ export const DEALERS = {
       showVehicleSelection: true,
     },
   },
+
+  'icaur-george': {
+    name: 'ICAUR GEORGE',
+    branchCode: 'VDWG005',
+    dealershipID: '8e29b9cf-b40f-49ca-8070-0482c58a2db5',
+    financeType: 'vehicle',
+    edithEnv: 'prod',
+    contactEmail: 'debbie@pmgrp.co.za',
+    billingType: 'fixed',
+    groupKey: 'Platina Motor Group',
+    allowedDomains: [
+      'https://www.icaurgardenroute.co.za/',
+      'icaur-george.seritifinance.findndrive.co.za',
+      'seritifinance.findndrive.co.za',
+    ],
+    theme: {
+      primary: '#f59e0b',
+      gradient: 'linear-gradient(135deg, #f59e0b 0%, #f59e0b 100%)',
+      fontFamily: "'Inter', sans-serif",
+      borderRadius: '12px',
+    },
+    features: {
+      showDeposit: true,
+      showCurrentFinance: true,
+      vehicleQueryParams: true,
+      showVehicleSelection: true,
+    },
+  },
   // ─────────────────────────────────────────────────────────────
   // ADD MORE DEALERS BELOW — copy a block, change the values
   // ─────────────────────────────────────────────────────────────
