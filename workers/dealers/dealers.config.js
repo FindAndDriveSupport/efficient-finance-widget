@@ -1014,6 +1014,34 @@ export const DEALERS = {
       showVehicleSelection: true,
     },
   },
+
+  'jeep-rustenburg': {
+    name: 'Jeep Rustenburg',
+    branchCode: 'VDWG003',
+    dealershipID: '0465f030-37f1-417a-ba02-ed087cb7cce0',
+    financeType: 'vehicle',
+    edithEnv: 'prod',
+    contactEmail: 'debbie@pmgrp.co.za',
+    billingType: 'fixed',
+    groupKey: 'Platina Motor Group',
+    allowedDomains: [
+      'https://www.jeeprustenburg.co.za/',
+      'jeep-rustenburg.seritifinance.findndrive.co.za',
+      'seritifinance.findndrive.co.za',
+    ],
+    theme: {
+      primary: '#42766a',
+      gradient: 'linear-gradient(135deg, #42766a 0%, #42766a 100%)',
+      fontFamily: "'Inter', sans-serif",
+      borderRadius: '12px',
+    },
+    features: {
+      showDeposit: true,
+      showCurrentFinance: true,
+      vehicleQueryParams: true,
+      showVehicleSelection: true,
+    },
+  },
   // ─────────────────────────────────────────────────────────────
   // ADD MORE DEALERS BELOW — copy a block, change the values
   // ─────────────────────────────────────────────────────────────
