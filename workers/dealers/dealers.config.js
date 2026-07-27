@@ -958,6 +958,34 @@ export const DEALERS = {
       showVehicleSelection: true,
     },
   },
+
+  'mahindra-garden-route': {
+    name: 'Mahindra Garden Route',
+    branchCode: 'VDWG001',
+    dealershipID: '71fa23b3-57a3-4ef6-9b8a-12eec469fab8',
+    financeType: 'vehicle',
+    edithEnv: 'prod',
+    contactEmail: 'debbie@pmgrp.co.za',
+    billingType: 'fixed',
+    groupKey: 'Platina Motor Group',
+    allowedDomains: [
+      'https://www.mahindragardenroute.co.za/',
+      'mahindra-garden-route.seritifinance.findndrive.co.za',
+      'seritifinance.findndrive.co.za',
+    ],
+    theme: {
+      primary: '#e00f2f',
+      gradient: 'linear-gradient(135deg, #e00f2f 0%, #e00f2f 100%)',
+      fontFamily: "'Inter', sans-serif",
+      borderRadius: '12px',
+    },
+    features: {
+      showDeposit: true,
+      showCurrentFinance: true,
+      vehicleQueryParams: true,
+      showVehicleSelection: true,
+    },
+  },
   // ─────────────────────────────────────────────────────────────
   // ADD MORE DEALERS BELOW — copy a block, change the values
   // ─────────────────────────────────────────────────────────────
