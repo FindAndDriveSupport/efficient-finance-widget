@@ -92,15 +92,27 @@ function sleepBetweenDealers(ms) {
 // policies specifically, with per-dealer visibility into how many
 // orphaned policies got matched via idNumber vs mobileNumber vs no match
 // at all — rather than one opaque whole-account number.
-export async function runPerDealerBackfill(env, sinceDate = '10-jun-2026 00:00') {
-  const { results: dealers } = await env.DB.prepare(
-    `SELECT id, branch_code FROM dealers WHERE branch_code IS NOT NULL AND branch_code != ''`
+export async function runPerDealerBackfill(env, sinceDate = '10-jun-2026 00:00', offset = 0, limit = null) {
+  const { results: allDealers } = await env.DB.prepare(
+    `SELECT id, branch_code FROM dealers WHERE branch_code IS NOT NULL AND branch_code != '' ORDER BY id`
   ).all();
+
+  // Batching — even running in the background via ctx.waitUntil() has its
+  // own time limit, which 36 dealers' worth of sequential Edith SOAP calls
+  // (plus detail fetches for changed/orphaned policies) genuinely exceeds —
+  // confirmed via a real "waitUntil() tasks did not complete... cancelled"
+  // warning. Processing a SUBSET of dealers per call (via ?offset=&limit=)
+  // keeps each individual run safely within both the request timeout and
+  // the background task time budget — run this multiple times with
+  // increasing offsets to cover everyone.
+  const dealers = limit ? allDealers.slice(offset, offset + limit) : allDealers.slice(offset);
 
   console.log(JSON.stringify({
     level: 'info',
     type: 'per_dealer_backfill_start',
     dealerCount: dealers.length,
+    totalDealerCount: allDealers.length,
+    offset, limit,
     sinceDate,
     ts: new Date().toISOString(),
   }));
@@ -137,6 +149,9 @@ export async function runPerDealerBackfill(env, sinceDate = '10-jun-2026 00:00')
 
   const summary = {
     dealerCount: dealers.length,
+    offset, limit,
+    nextOffset: offset + dealers.length < allDealers.length ? offset + dealers.length : null,
+    totalDealerCount: allDealers.length,
     totalChecked, totalUpdated, totalInserted, totalPromoted, totalDetailFetches,
     perDealer: perDealerResults,
   };
@@ -145,6 +160,7 @@ export async function runPerDealerBackfill(env, sinceDate = '10-jun-2026 00:00')
     level: 'info',
     type: 'per_dealer_backfill_done',
     dealerCount: dealers.length,
+    nextOffset: summary.nextOffset,
     totalPromoted,
     ts: new Date().toISOString(),
   }));
