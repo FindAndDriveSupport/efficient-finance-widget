@@ -194,24 +194,27 @@ export default {
       // GetPolicyStatusList individually for EACH one — rather than one
       // branchCode: 'ALL' account-wide call. Lets the ID/mobile number
       // promotion matching run with per-dealer visibility into results.
-      // Usage: /api/debug/backfill-per-dealer?key=...&since=10-jun-2026 00:00
+      // Usage: /api/debug/backfill-per-dealer?key=...&since=10-jun-2026 00:00&offset=0&limit=8
       // Runs in the BACKGROUND via ctx.waitUntil() — returns immediately
-      // rather than waiting synchronously for all dealers to finish, which
-      // was hitting Cloudflare's platform-level request timeout for a task
-      // this long (36 dealers, each with sequential Edith SOAP calls plus
-      // detail fetches for changed/orphaned policies). Check the Cloudflare
-      // log stream for progress (per_dealer_backfill_dealer_done lines) and
-      // per_dealer_backfill_done for the final summary — same information
-      // that used to come back in the HTTP response, just via logs instead.
+      // rather than waiting synchronously for dealers to finish. Even
+      // background execution has its own time limit though (confirmed via
+      // a real "waitUntil() tasks did not complete... cancelled" warning
+      // processing all 36 dealers in one call) — use offset/limit to run
+      // in smaller batches instead, e.g. limit=8 run five times with
+      // offset=0,8,16,24,32. Each response includes nextOffset (in the
+      // eventual summary log) to chain the next call.
       if (path === '/api/debug/backfill-per-dealer' && method === 'GET') {
         const key = url.searchParams.get('key');
         if (!env.DEBUG_SYNC_KEY || key !== env.DEBUG_SYNC_KEY) {
           return jsonResponse({ error: 'Not found' }, 404, origin, env);
         }
         const sinceDate = url.searchParams.get('since') || undefined;
+        const offset = parseInt(url.searchParams.get('offset') || '0', 10);
+        const limitParam = url.searchParams.get('limit');
+        const limit = limitParam ? parseInt(limitParam, 10) : null;
 
         ctx.waitUntil(
-          (sinceDate ? runPerDealerBackfill(env, sinceDate) : runPerDealerBackfill(env))
+          runPerDealerBackfill(env, sinceDate || '10-jun-2026 00:00', offset, limit)
             .catch(err => console.error('[backfill-per-dealer] background run failed:', err.message))
         );
 
@@ -219,6 +222,7 @@ export default {
           started: true,
           message: 'Per-dealer backfill running in the background — check the Cloudflare log stream for progress (search "per_dealer_backfill") and the final summary (search "per_dealer_backfill_done").',
           sinceDate: sinceDate || '(default)',
+          offset, limit,
         }, 202, origin, env);
       }
 
