@@ -73,7 +73,81 @@ export async function runFullBackfill(env, sinceDate = '10-jun-2026 00:00') {
   return processStatusSync(env, sinceDate);
 }
 
-async function processStatusSync(env, startDate) {
+const DEALER_FETCH_DELAY_MS = 1000; // be gentle on Edith between dealers
+
+function sleepBetweenDealers(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// Per-dealer-scoped backfill — loops through every dealer in D1 with a
+// known branch_code, calling GetPolicyStatusList individually for EACH one
+// (rather than the single branchCode: 'ALL' account-wide call the daily
+// sync and runFullBackfill use). This is what actually lets the ID/mobile
+// number promotion matching run against every dealer's own historical
+// policies specifically, with per-dealer visibility into how many
+// orphaned policies got matched via idNumber vs mobileNumber vs no match
+// at all — rather than one opaque whole-account number.
+export async function runPerDealerBackfill(env, sinceDate = '10-jun-2026 00:00') {
+  const { results: dealers } = await env.DB.prepare(
+    `SELECT id, branch_code FROM dealers WHERE branch_code IS NOT NULL AND branch_code != ''`
+  ).all();
+
+  console.log(JSON.stringify({
+    level: 'info',
+    type: 'per_dealer_backfill_start',
+    dealerCount: dealers.length,
+    sinceDate,
+    ts: new Date().toISOString(),
+  }));
+
+  const perDealerResults = [];
+  let totalChecked = 0, totalUpdated = 0, totalInserted = 0, totalPromoted = 0, totalDetailFetches = 0;
+
+  for (const dealer of dealers) {
+    try {
+      const result = await processStatusSync(env, sinceDate, dealer.branch_code);
+      perDealerResults.push({ dealerId: dealer.id, branchCode: dealer.branch_code, ...result });
+
+      totalChecked       += result.checked || 0;
+      totalUpdated        += result.updated || 0;
+      totalInserted        += result.inserted || 0;
+      totalPromoted        += result.promoted || 0;
+      totalDetailFetches   += result.detailFetches || 0;
+
+      console.log(JSON.stringify({
+        level: 'info',
+        type: 'per_dealer_backfill_dealer_done',
+        dealerId: dealer.id,
+        branchCode: dealer.branch_code,
+        ...result,
+        ts: new Date().toISOString(),
+      }));
+    } catch (err) {
+      logError('per_dealer_backfill_dealer_failed', { dealerId: dealer.id, branchCode: dealer.branch_code, message: err.message }, env);
+      perDealerResults.push({ dealerId: dealer.id, branchCode: dealer.branch_code, error: err.message });
+    }
+
+    await sleepBetweenDealers(DEALER_FETCH_DELAY_MS);
+  }
+
+  const summary = {
+    dealerCount: dealers.length,
+    totalChecked, totalUpdated, totalInserted, totalPromoted, totalDetailFetches,
+    perDealer: perDealerResults,
+  };
+
+  console.log(JSON.stringify({
+    level: 'info',
+    type: 'per_dealer_backfill_done',
+    dealerCount: dealers.length,
+    totalPromoted,
+    ts: new Date().toISOString(),
+  }));
+
+  return summary;
+}
+
+async function processStatusSync(env, startDate, branchCode = 'ALL') {
   const { companyCode, companyPass, wsdlUrl } = selectEdithCredentials(env);
 
   console.log(JSON.stringify({
@@ -85,7 +159,7 @@ async function processStatusSync(env, startDate) {
 
   let statusList;
   try {
-    statusList = await getPolicyStatusList(wsdlUrl, companyCode, companyPass, startDate);
+    statusList = await getPolicyStatusList(wsdlUrl, companyCode, companyPass, startDate, branchCode);
   } catch (err) {
     logError('status_sync_list_failed', { message: err.message }, env);
     return { checked: 0, updated: 0, inserted: 0, promoted: 0, detailFetches: 0, error: err.message };
@@ -546,8 +620,8 @@ async function insertPolicyFromEdith(env, {
 
 // ---------- Edith SOAP calls ----------
 
-async function getPolicyStatusList(wsdlUrl, companyCode, companyPass, startDate) {
-  const xml = buildStatusListXML(companyCode, companyPass, startDate);
+async function getPolicyStatusList(wsdlUrl, companyCode, companyPass, startDate, branchCode = 'ALL') {
+  const xml = buildStatusListXML(companyCode, companyPass, startDate, branchCode);
   const rawText = await soapFetch(wsdlUrl, xml, 'GetPolicyStatusList');
   return parseStatusListXML(rawText);
 }
@@ -560,7 +634,7 @@ export async function debugFetchStatusListXML(env) {
   return { requestXml: xml, responseXml: rawText, startDate: lastRun };
 }
 
-function buildStatusListXML(companyCode, companyPass, startDate) {
+function buildStatusListXML(companyCode, companyPass, startDate, branchCode = 'ALL') {
   return `<?xml version="1.0" encoding="utf-8"?>
 <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tem="http://ws.edith.co.za/EdithServices/PolicyServicesV300">
   <soap:Body>
@@ -570,7 +644,7 @@ function buildStatusListXML(companyCode, companyPass, startDate) {
         <tem:CompanyPassword>${esc(companyPass)}</tem:CompanyPassword>
       </tem:credentials>
       <tem:salesCompanyCode>${esc(companyCode)}</tem:salesCompanyCode>
-      <tem:branchCode>ALL</tem:branchCode>
+      <tem:branchCode>${esc(branchCode)}</tem:branchCode>
       <tem:startDate>${esc(startDate)}</tem:startDate>
       <tem:listType>EDIT</tem:listType>
     </tem:GetPolicyStatusList>
