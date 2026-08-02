@@ -239,22 +239,29 @@ async function processStatusSync(env, startDate) {
       const details = result.value;
       detailFetchCount++;
 
-      if (!details?.ApplicantIdNumber) {
-        console.log(JSON.stringify({
-          level: 'info',
-          type: 'status_sync_promotion_no_id_number',
-          policyNumber: entry.PolicyNumber,
-          ts: new Date().toISOString(),
-        }));
-        continue;
+      // Try ID number first (high-intent leads) — more precise, since it's
+      // an exact identity match rather than a phone number that could
+      // theoretically be shared/reassigned. Falls back to mobile number
+      // (low-intent leads) whenever there's no ID number at all, or the ID
+      // didn't match anything — this covers leads that never reached
+      // ID-verification but still may have gone on to a real policy.
+      let match = details?.ApplicantIdNumber
+        ? await findApplicantByIdNumber(env, details.ApplicantIdNumber)
+        : null;
+      let matchedVia = match ? 'idNumber' : null;
+
+      if (!match && details?.ApplicantMobile) {
+        match = await findApplicantByMobileNumber(env, details.ApplicantMobile);
+        matchedVia = match ? 'mobileNumber' : null;
       }
 
-      const match = await findApplicantByIdNumber(env, details.ApplicantIdNumber);
       if (!match) {
         console.log(JSON.stringify({
           level: 'info',
           type: 'status_sync_promotion_no_match',
           policyNumber: entry.PolicyNumber,
+          hadIdNumber: !!details?.ApplicantIdNumber,
+          hadMobileNumber: !!details?.ApplicantMobile,
           ts: new Date().toISOString(),
         }));
         continue;
@@ -288,6 +295,7 @@ async function processStatusSync(env, startDate) {
           type: 'status_sync_promoted',
           policyNumber: entry.PolicyNumber,
           dealerKey: match.dealerKey,
+          matchedVia,
           ts: new Date().toISOString(),
         }));
       }
@@ -382,6 +390,58 @@ async function findApplicantByIdNumber(env, idNumber) {
     return { applicantId: row.applicant_id, dealerKey: row.dealer_key };
   } catch (err) {
     logError('status_sync_promotion_lookup_failed', { idNumber, message: err.message }, env);
+    return null;
+  }
+}
+
+// Normalizes to the canonical SA mobile format: exactly 10 digits,
+// starting with 0. Strips everything else (spaces, dashes, +27 country
+// code, etc.) first. Returns null if the result doesn't conform — such a
+// number is never attempted for matching rather than risking a false
+// positive on a malformed value.
+function normalizeMobileNumber(raw) {
+  if (!raw) return null;
+  let digits = String(raw).replace(/\D/g, '');
+
+  // 27XXXXXXXXX (11 digits, SA country code) -> 0XXXXXXXXX (10 digits)
+  if (digits.length === 11 && digits.startsWith('27')) {
+    digits = '0' + digits.slice(2);
+  }
+  // 9 digits with no leading 0 (country code + leading 0 both stripped
+  // somewhere upstream) -> re-add the 0
+  if (digits.length === 9 && !digits.startsWith('0')) {
+    digits = '0' + digits;
+  }
+
+  return (digits.length === 10 && digits.startsWith('0')) ? digits : null;
+}
+
+// Fallback match for orphaned policies with no ID number (or no ID-number
+// match) — checks low-intent leads by mobile number instead. Low-intent
+// leads never carry an idNumber field at all (per Seriti's own schema), so
+// this is the only viable match path for that whole tier of leads. A loose
+// SQL LIKE pre-filter (last 9 digits) narrows candidates cheaply, with the
+// precise normalized comparison done in JS to eliminate any false
+// positives the loose filter might let through.
+async function findApplicantByMobileNumber(env, rawMobileNumber) {
+  const target = normalizeMobileNumber(rawMobileNumber);
+  if (!target) return null;
+
+  try {
+    const { results } = await env.DB.prepare(`
+      SELECT applicant_id, dealer_key, json_extract(data, '$.mobileNumber') as mobile
+      FROM seriti_intent_leads
+      WHERE intent_type = 'low' AND json_extract(data, '$.mobileNumber') LIKE ?
+    `).bind(`%${target.slice(-9)}`).all();
+
+    for (const row of results) {
+      if (normalizeMobileNumber(row.mobile) === target) {
+        return { applicantId: row.applicant_id, dealerKey: row.dealer_key };
+      }
+    }
+    return null;
+  } catch (err) {
+    logError('status_sync_promotion_mobile_lookup_failed', { rawMobileNumber, message: err.message }, env);
     return null;
   }
 }
