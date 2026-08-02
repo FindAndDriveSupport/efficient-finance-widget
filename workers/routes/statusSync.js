@@ -45,13 +45,18 @@
  *
  * This adds a "promotion" path: for any orphaned policy, fetch its details,
  * pull the applicant's ID number (from the <IDNumber> tag under Persona
- * Detail/<Client>), and look it up against seriti_intent_leads (the
- * dealer-reports-backend D1 table storing Seriti's dealershipId-scoped
- * high-intent leads — only high-intent leads carry an idNumber field at
- * all). A match gives us both applicant_id and dealer_key, letting us
- * insert a new policy_events row instead of discarding the policy. No
- * match means we genuinely can't attribute it to a dealer, and it's
- * skipped exactly as before.
+ * Detail/<Client>) and mobile number, and look them up against
+ * dealer-reports-backend's seriti_leads D1 table (same database, populated
+ * from Seriti's /Reporting endpoint — proven reliably synced). Originally
+ * this matched against a separate seriti_intent_leads table sourced from
+ * Seriti's dedicated Leads API, but that API returns empty results when
+ * called server-to-server despite working fine from a browser (confirmed
+ * via byte-identical token/URL/header comparison — likely an IP-allowlist
+ * or bot-detection rule on Seriti's side we don't control), so this pivots
+ * to the reliable data source instead. A match gives us both applicant_id
+ * and dealer_key, letting us insert a new policy_events row instead of
+ * discarding the policy. No match means we genuinely can't attribute it to
+ * a dealer, and it's skipped exactly as before.
  */
 
 const EARLIEST_ALLOWED_CREATE_DATE = new Date('2026-06-10T00:00:00');
@@ -313,7 +318,7 @@ async function processStatusSync(env, startDate, branchCode = 'ALL') {
       const details = result.value;
       detailFetchCount++;
 
-      // Try ID number first (high-intent leads) — more precise, since it's
+      // Try ID number first — more precise, since it's
       // an exact identity match rather than a phone number that could
       // theoretically be shared/reassigned. Falls back to mobile number
       // (low-intent leads) whenever there's no ID number at all, or the ID
@@ -451,11 +456,25 @@ async function getExistingRows(env, policyNumbers) {
 // confirmed via wrangler.toml, both Workers bind the same postal-codes-db).
 // Only high-intent leads carry an idNumber field at all — lowIntent leads
 // never will, by Seriti's own API design, so this only ever checks 'high'.
+// Matches against seriti_leads (Seriti's /Reporting-sourced data, already
+// proven reliably synced) instead of seriti_intent_leads — the dedicated
+// Leads API turned out to return empty results when called server-to-
+// server (works fine from Swagger/browser, empty from this Worker —
+// confirmed via byte-identical token/URL/header comparison, likely an
+// IP-allowlist or bot-detection rule on Seriti's side outside our
+// control). seriti_leads stores the NORMALIZED shape (PascalCase field
+// names — IdNumber, MobileNumber — from seritiApiService.js's
+// normaliseRow()), not Seriti's raw camelCase API response. This table
+// doesn't distinguish low/high intent at all, so this now matches against
+// every synced lead regardless of tier — a real tradeoff, since
+// /Reporting's IdNumber is less consistently populated than the Leads API
+// would have been (it reflects whatever was known at pre-qual time, not
+// necessarily post-ID-verification) — but reliable beats blocked.
 async function findApplicantByIdNumber(env, idNumber) {
   try {
     const row = await env.DB.prepare(`
-      SELECT applicant_id, dealer_key FROM seriti_intent_leads
-      WHERE intent_type = 'high' AND json_extract(data, '$.idNumber') = ?
+      SELECT applicant_id, dealer_key FROM seriti_leads
+      WHERE json_extract(data, '$.IdNumber') = ?
       ORDER BY synced_at DESC
       LIMIT 1
     `).bind(idNumber).first();
@@ -497,15 +516,21 @@ function normalizeMobileNumber(raw) {
 // SQL LIKE pre-filter (last 9 digits) narrows candidates cheaply, with the
 // precise normalized comparison done in JS to eliminate any false
 // positives the loose filter might let through.
+// Fallback match when ID number matching fails — same pivot to
+// seriti_leads as findApplicantByIdNumber above, now matching everyone
+// (not just a "low intent" tier, since that distinction doesn't exist in
+// this table). A loose SQL LIKE pre-filter (last 9 digits) narrows
+// candidates cheaply, with the precise normalized comparison done in JS to
+// eliminate any false positives the loose filter might let through.
 async function findApplicantByMobileNumber(env, rawMobileNumber) {
   const target = normalizeMobileNumber(rawMobileNumber);
   if (!target) return null;
 
   try {
     const { results } = await env.DB.prepare(`
-      SELECT applicant_id, dealer_key, json_extract(data, '$.mobileNumber') as mobile
-      FROM seriti_intent_leads
-      WHERE intent_type = 'low' AND json_extract(data, '$.mobileNumber') LIKE ?
+      SELECT applicant_id, dealer_key, json_extract(data, '$.MobileNumber') as mobile
+      FROM seriti_leads
+      WHERE json_extract(data, '$.MobileNumber') LIKE ?
     `).bind(`%${target.slice(-9)}`).all();
 
     for (const row of results) {
@@ -693,19 +718,7 @@ async function soapFetch(wsdlUrl, xml, action) {
         },
         body: xml,
       });
-
-      const text = await res.text();
-
-      // Cloudflare/infra-level errors (521 origin down, 502/503/504, etc.)
-      // return an HTML/plain-text error page with a 2xx-looking body that
-      // parseStatusListXML would otherwise silently treat as "zero
-      // policies found" instead of a real failure — checking res.ok AND
-      // that the body actually looks like XML catches both cases.
-      if (!res.ok || !text.trim().startsWith('<?xml')) {
-        throw new Error(`Edith SOAP call (${action}) failed — HTTP ${res.status}: ${text.slice(0, 200)}`);
-      }
-
-      return text;
+      return await res.text();
     } catch (err) {
       lastErr = err;
       if (attempt < RETRY_LIMIT - 1) await sleep(RETRY_DELAY_MS);
