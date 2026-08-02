@@ -129,14 +129,17 @@ export default {
       }
 
       // ── TEMPORARY DEBUG ROUTE — view raw Edith XML directly in browser ──
+      // ?branchCode=... optional (defaults to ALL). ?since=dd-mmm-yyyy HH:nn optional.
       if (path === '/api/debug/raw-status-list' && method === 'GET') {
         const key = url.searchParams.get('key');
         if (!env.DEBUG_SYNC_KEY || key !== env.DEBUG_SYNC_KEY) {
           return jsonResponse({ error: 'Not found' }, 404, origin, env);
         }
+        const branchCodeParam = url.searchParams.get('branchCode') || 'ALL';
+        const sinceParam = url.searchParams.get('since') || null;
         try {
-          const { requestXml, responseXml, startDate } = await debugFetchStatusListXML(env);
-          const text = `startDate used: ${startDate}\n\n--- REQUEST XML ---\n${requestXml}\n\n--- RESPONSE XML ---\n${responseXml}`;
+          const { requestXml, responseXml, startDate, branchCode } = await debugFetchStatusListXML(env, branchCodeParam, sinceParam);
+          const text = `branchCode used: ${branchCode}\nstartDate used: ${startDate}\n\n--- REQUEST XML ---\n${requestXml}\n\n--- RESPONSE XML ---\n${responseXml}`;
           return new Response(text, {
             status: 200,
             headers: { 'Content-Type': 'text/plain; charset=utf-8', ...corsHeaders(origin, env) },
