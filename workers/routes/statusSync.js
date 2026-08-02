@@ -693,7 +693,19 @@ async function soapFetch(wsdlUrl, xml, action) {
         },
         body: xml,
       });
-      return await res.text();
+
+      const text = await res.text();
+
+      // Cloudflare/infra-level errors (521 origin down, 502/503/504, etc.)
+      // return an HTML/plain-text error page with a 2xx-looking body that
+      // parseStatusListXML would otherwise silently treat as "zero
+      // policies found" instead of a real failure — checking res.ok AND
+      // that the body actually looks like XML catches both cases.
+      if (!res.ok || !text.trim().startsWith('<?xml')) {
+        throw new Error(`Edith SOAP call (${action}) failed — HTTP ${res.status}: ${text.slice(0, 200)}`);
+      }
+
+      return text;
     } catch (err) {
       lastErr = err;
       if (attempt < RETRY_LIMIT - 1) await sleep(RETRY_DELAY_MS);
