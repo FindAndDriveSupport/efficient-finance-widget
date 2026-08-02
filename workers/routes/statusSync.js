@@ -626,12 +626,12 @@ async function getPolicyStatusList(wsdlUrl, companyCode, companyPass, startDate,
   return parseStatusListXML(rawText);
 }
 
-export async function debugFetchStatusListXML(env) {
-  const lastRun = await getLastRunDate(env);
+export async function debugFetchStatusListXML(env, branchCode = 'ALL', sinceDate = null) {
+  const lastRun = sinceDate || await getLastRunDate(env);
   const { companyCode, companyPass, wsdlUrl } = selectEdithCredentials(env);
-  const xml = buildStatusListXML(companyCode, companyPass, lastRun);
+  const xml = buildStatusListXML(companyCode, companyPass, lastRun, branchCode);
   const rawText = await soapFetch(wsdlUrl, xml, 'GetPolicyStatusList');
-  return { requestXml: xml, responseXml: rawText, startDate: lastRun };
+  return { requestXml: xml, responseXml: rawText, startDate: lastRun, branchCode };
 }
 
 function buildStatusListXML(companyCode, companyPass, startDate, branchCode = 'ALL') {
