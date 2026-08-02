@@ -381,6 +381,7 @@ async function processStatusSync(env, startDate, branchCode = 'ALL') {
         estimatedAmount: details.EstimatedAmount,
         lastAccessDate: entry.LastAccessDate,
         createdAt: entry.CreateDate, // real Edith creation date — NOT "now"
+        matchedVia,
       });
 
       if (promoted) {
@@ -624,17 +625,20 @@ async function upsertPolicyStatus(env, {
 }
 
 // Inserts a brand new policy_events row for a policy Edith knows about but
-// our system never created a row for — resolved via ID-number match
-// against seriti_intent_leads (see findApplicantByIdNumber above).
-// created_at is set to the policy's REAL Edith creation date (entry.CreateDate),
-// not "now" — otherwise a backfilled policy from weeks ago would show up
-// in TODAY's date-range-filtered Funnel/Finance Reports numbers instead of
-// its correct historical period.
+// our system never created a row for — resolved via ID-number or mobile-
+// number match against seriti_leads (see findApplicantByIdNumber /
+// findApplicantByMobileNumber above). created_at is set to the policy's
+// REAL Edith creation date (entry.CreateDate), not "now" — otherwise a
+// backfilled policy from weeks ago would show up in TODAY's date-range-
+// filtered Funnel/Finance Reports numbers instead of its correct
+// historical period. matchedVia ('idNumber' | 'mobileNumber') is persisted
+// so the dashboard can separately track how many applications came from
+// each matching path.
 async function insertPolicyFromEdith(env, {
   policyNumber, salesRef, branchCode, dealerKey, applicantId, financeType,
   applicationStatus, financeStatus, financeCompany, transactionStatus,
   applicantName, applicantMobile, applicantEmail, estimatedAmount,
-  lastAccessDate, createdAt,
+  lastAccessDate, createdAt, matchedVia,
 }) {
   const now = new Date().toISOString();
 
@@ -644,13 +648,13 @@ async function insertPolicyFromEdith(env, {
         dealer_key, policy_number, applicant_id, sales_ref, branch_code, finance_type,
         created_at, status, application_status, finance_status, finance_company,
         transaction_status, applicant_name, applicant_mobile, applicant_email,
-        estimated_amount, last_access_date, status_last_checked
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, 'success', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        estimated_amount, last_access_date, status_last_checked, matched_via
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, 'success', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       dealerKey, policyNumber, applicantId, salesRef || null, branchCode || null, financeType,
       createdAt || now, applicationStatus || null, financeStatus || null, financeCompany || null,
       transactionStatus || null, applicantName || null, applicantMobile || null, applicantEmail || null,
-      estimatedAmount || null, lastAccessDate || null, now,
+      estimatedAmount || null, lastAccessDate || null, now, matchedVia || null,
     ).run();
     return true;
   } catch (err) {
