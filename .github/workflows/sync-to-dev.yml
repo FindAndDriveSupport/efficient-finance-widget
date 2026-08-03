@@ -1,0 +1,114 @@
+name: Sync Prod to Dev (One-Off)
+
+# ONE-OFF, manually-triggered mirror of efficient-finance-widget (prod) INTO
+# efficient-finance-widget-dev — the reverse of "Sync from Dev". Used to
+# backfill dev with things prod has that dev is currently missing.
+#
+# THIS IS DESTRUCTIVE to dev: dev's tracked files (except the excludes
+# below) get overwritten to exactly match prod. No PR, no review step,
+# straight push to dev's main. Requires typing "yes" into the confirm
+# input — will not run without it.
+#
+# Lives in the PROD repo's (efficient-finance-widget) .github/workflows/ —
+# trigger it from prod's Actions tab, not dev's. Not meant to run on a
+# schedule or automatically on push, unlike "Sync from Dev" — if this ever
+# needs to become a recurring thing rather than a one-off, that's worth a
+# deliberate follow-up decision, not something to casually add a trigger to
+# later.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type exactly "yes" to confirm — this OVERWRITES dev to match prod.'
+        required: true
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    if: github.event.inputs.confirm == 'yes'
+
+    steps:
+      - name: Checkout prod repo (efficient-finance-widget)
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_PAT }}
+          path: prod
+
+      - name: Checkout dev repo (efficient-finance-widget-dev)
+        uses: actions/checkout@v4
+        with:
+          repository: FindAndDriveSupport/efficient-finance-widget-dev
+          token: ${{ secrets.GH_PAT }}
+          path: dev
+
+      - name: Sync files from prod to dev
+        run: |
+          # Same excludes as "Sync from Dev", same reasoning in reverse:
+          # dev needs to keep its OWN .env/.dev.vars/wrangler.toml (dev's
+          # Worker name/secrets must stay dev-specific — overwriting them
+          # with prod's could point dev's next deploy at the wrong Worker,
+          # or worse, prod's), and its own dealers.config.js unless you
+          # specifically want dev's dealer list reset to match prod as
+          # part of this run (edit the exclude list below deliberately if
+          # so, rather than by accident).
+          rsync -av --delete \
+            --exclude='.git/' \
+            --exclude='node_modules/' \
+            --exclude='.env' \
+            --exclude='.dev.vars' \
+            --exclude='wrangler.toml' \
+            --exclude='workers/dealers/dealers.config.js' \
+            --exclude='.github/' \
+            prod/ dev/
+
+      - name: Check for changes
+        id: changes
+        run: |
+          cd dev
+          git diff --quiet && echo "changed=false" >> $GITHUB_OUTPUT || echo "changed=true" >> $GITHUB_OUTPUT
+
+      - name: Commit and push changes
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          cd dev
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "chore: one-off sync from efficient-finance-widget (prod)"
+
+          # Rebase onto the latest remote main before pushing, with a few
+          # retries — protects against another push landing on main between
+          # this job's checkout and its push (e.g. an overlapping run, or a
+          # manual commit), which otherwise rejects the push outright with
+          # "! [rejected] main -> main (fetch first)".
+          for attempt in 1 2 3; do
+            git fetch origin main
+            if git rebase origin/main; then
+              if git push origin main; then
+                echo "✅ Pushed successfully (attempt $attempt)."
+                break
+              fi
+            else
+              echo "❌ Rebase produced a real conflict — needs manual resolution, not just a race condition."
+              git rebase --abort
+              exit 1
+            fi
+
+            if [ "$attempt" = "3" ]; then
+              echo "❌ Push still failing after 3 attempts — giving up."
+              exit 1
+            fi
+            echo "⚠️  Push rejected (attempt $attempt), retrying after rebase..."
+            sleep 3
+          done
+
+      - name: Report outcome
+        if: always()
+        run: |
+          if [ "${{ steps.changes.outputs.changed }}" = "true" ]; then
+            echo "✅ dev now mirrors prod (excluding .env, .dev.vars, wrangler.toml, dealers.config.js, .github/)."
+          else
+            echo "ℹ️  No differences found — dev already matched prod. Nothing pushed."
+          fi
+
