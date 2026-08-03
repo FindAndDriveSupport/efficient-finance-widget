@@ -1042,6 +1042,34 @@ export const DEALERS = {
       showVehicleSelection: true,
     },
   },
+
+  'yourcarguy': {
+    name: 'YourCarGuy',
+    branchCode: 'YCG001',
+    dealershipID: '6D551C34-6854-41DC-A3CD-C2ACEE0F4DD6',
+    financeType: 'vehicle',
+    edithEnv: 'prod',
+    contactEmail: 'sales@yourcarguy.co.za',
+    billingType: 'fixed',
+    groupKey: '',
+    allowedDomains: [
+      'https://yourcarguy.co.za/',
+      'yourcarguy.seritifinance.findndrive.co.za',
+      'seritifinance.findndrive.co.za',
+    ],
+    theme: {
+      primary: '#111827',
+      gradient: 'linear-gradient(135deg, #111827 0%, #111827 100%)',
+      fontFamily: "'Inter', sans-serif",
+      borderRadius: '12px',
+    },
+    features: {
+      showDeposit: true,
+      showCurrentFinance: true,
+      vehicleQueryParams: true,
+      showVehicleSelection: true,
+    },
+  },
   // ─────────────────────────────────────────────────────────────
   // ADD MORE DEALERS BELOW — copy a block, change the values
   // ─────────────────────────────────────────────────────────────
