@@ -1070,6 +1070,34 @@ export const DEALERS = {
       showVehicleSelection: true,
     },
   },
+
+  'car-factory-outlet': {
+    name: 'Car Factory Outlet',
+    branchCode: 'SGHO005',
+    dealershipID: '2c15f938-f6ed-4c7d-af11-96826c86168c',
+    financeType: 'vehicle',
+    edithEnv: 'prod',
+    contactEmail: 'mpho@findndrive.co.za',
+    billingType: 'transaction',
+    groupKey: '',
+    allowedDomains: [
+      'carfo.co.za',
+      'car-factory-outlet.seritifinance.findndrive.co.za',
+      'seritifinance.findndrive.co.za',
+    ],
+    theme: {
+      primary: '#f04438',
+      gradient: 'linear-gradient(135deg, #f04438 0%, #f04438 100%)',
+      fontFamily: "'Inter', sans-serif",
+      borderRadius: '12px',
+    },
+    features: {
+      showDeposit: true,
+      showCurrentFinance: true,
+      vehicleQueryParams: true,
+      showVehicleSelection: true,
+    },
+  },
   // ─────────────────────────────────────────────────────────────
   // ADD MORE DEALERS BELOW — copy a block, change the values
   // ─────────────────────────────────────────────────────────────
