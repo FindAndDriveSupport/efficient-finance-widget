@@ -504,6 +504,7 @@ function buildEdithXML(data, companyCode, companyPass, dealer, salesRef) {
       <tem:Policy>
         <tem:BranchCode>${dealer.branchCode}</tem:BranchCode>
         <tem:SalesReferenceNumber>${salesRef}</tem:SalesReferenceNumber>
+        <tem:SalesSystem>E-fficient Widget</tem:SalesSystem>
         <tem:TransactionType>VEHICLE SALE</tem:TransactionType>
         <tem:Category>PRIVATE</tem:Category>${bankAccountsXml}
         ${d.vehicleMake    ? `<tem:Manufacturer>${esc(d.vehicleMake)}</tem:Manufacturer>` : ''}
