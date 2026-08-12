@@ -1045,7 +1045,7 @@ export const DEALERS = {
 
   'yourcarguy': {
     name: 'YourCarGuy',
-    branchCode: 'YCG001',
+    branchCode: 'YCGY001',
     dealershipID: '6D551C34-6854-41DC-A3CD-C2ACEE0F4DD6',
     financeType: 'vehicle',
     edithEnv: 'prod',
