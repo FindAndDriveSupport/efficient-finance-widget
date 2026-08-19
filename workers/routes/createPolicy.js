@@ -93,6 +93,19 @@ export async function handleCreatePolicy(request, ctx, jsonResponse) {
     ts: new Date().toISOString(),
   }));
 
+  // ── TEMPORARY DEBUG LOG — remove once the mobile-number-rejected-by-Edith
+  // investigation is closed out. Logs the exact digits sent to Edith inside
+  // <tem:MobileNumber> so a rejected number can be compared against what
+  // was captured pre-normalisation in D1 (policy_events.applicant_mobile).
+  console.log(JSON.stringify({
+    level: 'info',
+    type: 'edith_outbound_mobile_debug',
+    salesRef,
+    mobileNumberRaw: body.mobileNumber || null,
+    mobileNumberNormalised: body.mobileNumber ? normaliseMobile(body.mobileNumber) : null,
+    ts: new Date().toISOString(),
+  }));
+
   // ── Fetch with retry (network failures only) ──────────────────
   let rawText = null;
   let fetchStatus = null;
