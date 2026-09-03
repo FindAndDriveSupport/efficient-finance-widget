@@ -21,6 +21,13 @@
 
 const MULTI_WORD_MAKES = ['Mercedes-Benz', 'Land Rover', 'Alfa Romeo', 'Great Wall', 'Aston Martin'];
 
+// SSRF guard: only ever fetch pages on domains we actually expect vehicle
+// context requests to reference. Extend this list as more dealer sites are
+// added — never fetch an arbitrary caller-supplied hostname.
+const ALLOWED_PAGE_HOSTS = ['carfo.co.za', 'www.carfo.co.za'];
+
+const VEHICLE_JSONLD_TYPES = ['Vehicle', 'Car', 'Product', 'AutoDealer', 'Offer'];
+
 export async function handleVehicleContextResolve(request, ctx2, jsonResponse) {
   const { env, origin } = ctx2;
 
@@ -49,7 +56,121 @@ export async function handleVehicleContextResolve(request, ctx2, jsonResponse) {
     return jsonResponse(resolved, 200, origin, env);
   }
 
+  // Case 3: widget only has the host page's URL (from document.referrer, since
+  // it can't read the parent page's DOM directly inside a cross-origin iframe).
+  // Fetch that ONE page server-side and read its JSON-LD — same data the page
+  // already publishes for search engines, just read from the server instead
+  // of the browser. Never fetches anything outside ALLOWED_PAGE_HOSTS.
+  if (body.pageUrl) {
+    const extracted = await extractVehicleFromPage(body.pageUrl);
+    if (!extracted) {
+      return jsonResponse({ resolved: false }, 200, origin, env);
+    }
+    if (extracted.make && extracted.model && extracted.year) {
+      const resolved = await resolveCanonical(env.DB, extracted.year, extracted.make, extracted.model);
+      return jsonResponse(resolved, 200, origin, env);
+    }
+    if (extracted.name) {
+      const parsed = parseVehicleName(extracted.name, extracted.year);
+      if (parsed) {
+        const resolved = await resolveCanonical(env.DB, parsed.year, parsed.make, parsed.model);
+        return jsonResponse(resolved, 200, origin, env);
+      }
+    }
+    return jsonResponse({ resolved: false }, 200, origin, env);
+  }
+
   return jsonResponse({ resolved: false }, 400, origin, env);
+}
+
+/**
+ * Fetches a single dealer page and reads its JSON-LD, looking for a vehicle-
+ * shaped node. Returns { name?, year?, make?, model? } or null — never throws;
+ * any failure (disallowed host, network error, no JSON-LD, malformed JSON)
+ * just means "nothing found," same as any other unresolved case.
+ */
+async function extractVehicleFromPage(pageUrl) {
+  let parsedUrl;
+  try {
+    parsedUrl = new URL(pageUrl);
+  } catch {
+    return null;
+  }
+  if (!ALLOWED_PAGE_HOSTS.includes(parsedUrl.hostname)) {
+    return null;
+  }
+
+  let res;
+  try {
+    res = await fetch(parsedUrl.toString(), {
+      headers: { 'User-Agent': 'FindAndDriveVehicleContextBot/1.0 (+vehicle finance widget)' },
+      cf: { cacheTtl: 300, cacheEverything: true }, // avoid re-fetching the same page repeatedly (spec §10)
+    });
+  } catch {
+    return null;
+  }
+  if (!res.ok) return null;
+
+  const jsonLdChunks = [];
+  let buffer = '';
+  const rewriter = new HTMLRewriter().on('script[type="application/ld+json"]', {
+    text(chunk) {
+      buffer += chunk.text;
+      if (chunk.lastInTextNode) {
+        jsonLdChunks.push(buffer);
+        buffer = '';
+      }
+    },
+  });
+
+  try {
+    await rewriter.transform(res).text(); // drains the stream so the handlers above actually run
+  } catch {
+    return null;
+  }
+
+  const nodes = [];
+  for (const chunk of jsonLdChunks) {
+    let parsed;
+    try {
+      parsed = JSON.parse(chunk);
+    } catch {
+      continue; // malformed JSON-LD block — skip it, don't fail the whole page
+    }
+    flattenJsonLd(parsed, nodes);
+  }
+
+  const vehicleNode = nodes.find((node) => {
+    const t = node['@type'];
+    const types = Array.isArray(t) ? t : (typeof t === 'string' ? [t] : []);
+    return types.some((type) => VEHICLE_JSONLD_TYPES.includes(type));
+  });
+  if (!vehicleNode) return null;
+
+  const brand = vehicleNode.brand && (typeof vehicleNode.brand === 'object' ? vehicleNode.brand.name : vehicleNode.brand);
+  const model = typeof vehicleNode.model === 'string' ? vehicleNode.model : vehicleNode.model?.name;
+  const rawYear = vehicleNode.vehicleModelDate || vehicleNode.modelDate || vehicleNode.productionDate || vehicleNode.releaseDate;
+
+  return {
+    name: typeof vehicleNode.name === 'string' ? vehicleNode.name : undefined,
+    year: sanitizeYear(rawYear),
+    make: typeof brand === 'string' ? sanitizeText(brand) : undefined,
+    model: typeof model === 'string' ? sanitizeText(model) : undefined,
+  };
+}
+
+function flattenJsonLd(value, out) {
+  if (Array.isArray(value)) {
+    value.forEach((v) => flattenJsonLd(v, out));
+    return;
+  }
+  if (value && typeof value === 'object') {
+    if (Array.isArray(value['@graph'])) {
+      flattenJsonLd(value['@graph'], out);
+      return;
+    }
+    out.push(value);
+  }
 }
 
 /**
