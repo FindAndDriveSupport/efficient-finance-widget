@@ -11,21 +11,24 @@
  * trusting the page.
  *
  * Expects env.DB bound to the D1 database holding vehicle_stock.
+ *
+ * Follows the same handler signature as the other routes/*.js files:
+ * handleX(request, ctx2, jsonResponse), where ctx2 = { env, dealerConfig, origin, ctx }
+ * and jsonResponse is the shared (data, status, origin, env) => Response helper
+ * from worker.js. CORS is already handled globally there, so nothing extra
+ * is needed here for that.
  */
 
 const MULTI_WORD_MAKES = ['Mercedes-Benz', 'Land Rover', 'Alfa Romeo', 'Great Wall', 'Aston Martin'];
 
-/**
- * Adjust the export/signature here to match how your router calls the other
- * files in this folder (e.g. if preQual.js exports `handlePreQual(request, env)`
- * instead, rename this to match and drop the wrapping object).
- */
-export async function handleVehicleContextResolve(request, env) {
+export async function handleVehicleContextResolve(request, ctx2, jsonResponse) {
+  const { env, origin } = ctx2;
+
   let body;
   try {
     body = await request.json();
   } catch {
-    return jsonResponse({ resolved: false, error: 'invalid_json' }, 400);
+    return jsonResponse({ resolved: false, error: 'invalid_json' }, 400, origin, env);
   }
 
   const year = sanitizeYear(body.year);
@@ -33,20 +36,20 @@ export async function handleVehicleContextResolve(request, env) {
   // Case 1: widget already has separated make/model (from structured JSON-LD fields).
   if (body.make && body.model && year) {
     const resolved = await resolveCanonical(env.DB, year, sanitizeText(body.make), sanitizeText(body.model));
-    return jsonResponse(resolved);
+    return jsonResponse(resolved, 200, origin, env);
   }
 
   // Case 2: widget only has a combined free-text name — parse it here, server-side.
   if (body.name) {
     const parsed = parseVehicleName(sanitizeText(body.name), year);
     if (!parsed) {
-      return jsonResponse({ resolved: false });
+      return jsonResponse({ resolved: false }, 200, origin, env);
     }
     const resolved = await resolveCanonical(env.DB, parsed.year, parsed.make, parsed.model);
-    return jsonResponse(resolved);
+    return jsonResponse(resolved, 200, origin, env);
   }
 
-  return jsonResponse({ resolved: false }, 400);
+  return jsonResponse({ resolved: false }, 400, origin, env);
 }
 
 /**
@@ -155,11 +158,4 @@ function sanitizeText(s) {
 
 function titleCase(s) {
   return s === s.toUpperCase() ? s.replace(/\w\S*/g, (w) => w[0].toUpperCase() + w.slice(1).toLowerCase()) : s;
-}
-
-function jsonResponse(body, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'Content-Type': 'application/json' },
-  });
 }
