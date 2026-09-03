@@ -61,13 +61,15 @@ export async function handleVehicleContextResolve(request, ctx2, jsonResponse) {
  *  3. No match — page-derived value is still returned (the widget needs
  *     *something* to pre-populate with), but flagged canonical:false so the
  *     finance flow / analytics can tell it wasn't verified against our data.
+ *     No mmcode is available in this case — Edith submission must not send
+ *     a stale/guessed one, so it comes back undefined.
  *
- * Returns: { resolved, canonical, matchType: 'exact'|'fuzzy'|'none', year, make, model }
+ * Returns: { resolved, canonical, matchType: 'exact'|'fuzzy'|'none', year, make, model, mmcode? }
  */
 async function resolveCanonical(db, year, make, model) {
   const exact = await db
     .prepare(
-      `SELECT DISTINCT year, make, model FROM vehicle_stock
+      `SELECT DISTINCT year, make, model, mmcode FROM vehicle_stock
        WHERE year = ?1 AND make = ?2 COLLATE NOCASE AND model = ?3 COLLATE NOCASE
        LIMIT 1`
     )
@@ -82,7 +84,7 @@ async function resolveCanonical(db, year, make, model) {
   if (leadWord) {
     const fuzzy = await db
       .prepare(
-        `SELECT DISTINCT year, make, model FROM vehicle_stock
+        `SELECT DISTINCT year, make, model, mmcode FROM vehicle_stock
          WHERE make = ?1 COLLATE NOCASE AND model LIKE ?2 COLLATE NOCASE
          ORDER BY ABS(year - ?3) ASC
          LIMIT 1`
@@ -96,6 +98,7 @@ async function resolveCanonical(db, year, make, model) {
   }
 
   // Nothing in the reference table — pass the page-derived value through unmatched.
+  // mmcode intentionally omitted: we have no verified code to give it.
   return { resolved: true, canonical: false, matchType: 'none', year, make, model };
 }
 
@@ -103,6 +106,46 @@ async function resolveCanonical(db, year, make, model) {
 function leadingModelWord(model) {
   const word = model.trim().split(/\s+/)[0];
   return word && word.length >= 2 ? word : null;
+}
+
+/**
+ * GET /api/vehicle-context/mmcode?make=...&model=...
+ *
+ * Used by the manual vehicle-selection flow (VehicleSelection / Step3 dropdowns),
+ * which pick make/model from /api/lookup/vehicle-makes and vehicle-models — a
+ * separate lookup table from vehicle_stock, so mmcode isn't known until this
+ * is called explicitly once the customer has picked both fields.
+ *
+ * No year is collected in the manual flow, so this matches on make+model alone
+ * and, if more than one year is in stock for that combo, prefers the most
+ * recent one. Returns { resolved: false } if there's no match — the frontend
+ * should leave vehicleMm unset in that case rather than sending a guess to Edith.
+ */
+export async function handleVehicleMmcodeLookup(request, ctx2, jsonResponse) {
+  const { env, origin } = ctx2;
+  const url = new URL(request.url);
+  const make = sanitizeText(url.searchParams.get('make') || '');
+  const model = sanitizeText(url.searchParams.get('model') || '');
+
+  if (!make || !model) {
+    return jsonResponse({ resolved: false, error: 'missing_make_or_model' }, 400, origin, env);
+  }
+
+  const row = await env.DB
+    .prepare(
+      `SELECT mmcode, year FROM vehicle_stock
+       WHERE make = ?1 COLLATE NOCASE AND model = ?2 COLLATE NOCASE
+       ORDER BY year DESC
+       LIMIT 1`
+    )
+    .bind(make, model)
+    .first();
+
+  if (!row) {
+    return jsonResponse({ resolved: false }, 200, origin, env);
+  }
+
+  return jsonResponse({ resolved: true, mmcode: row.mmcode, year: row.year }, 200, origin, env);
 }
 
 /** Mirrors the JSON-LD parsing rule from spec §6: don't naively split on spaces. */
