@@ -13,7 +13,7 @@ import { handleDealerConfig }    from './routes/dealerConfig.js';
 import { handleAddressSearch }   from './routes/addressSearch.js';
 import { handleGetPolicies }     from './routes/getPolicies.js';
 import { handleLookups }         from './routes/lookups.js';
-import { handleVehicleContextResolve } from './routes/vehicleContextResolve.js';
+import { handleVehicleContextResolve, handleVehicleMmcodeLookup } from './routes/vehicleContextResolve.js';
 import { runStatusSync, runFullBackfill, runPerDealerBackfill, debugFetchStatusListXML, debugFetchPolicyDetailsXML } from './routes/statusSync.js';
 
 // ── CORS headers ──────────────────────────────────────────────
@@ -120,6 +120,9 @@ export default {
       }
       if (path === '/api/vehicle-context/resolve' && method === 'POST') {
         return handleVehicleContextResolve(request, ctx2, jsonResponse);
+      }
+      if (path === '/api/vehicle-context/mmcode' && method === 'GET') {
+        return handleVehicleMmcodeLookup(request, ctx2, jsonResponse);
       }
 
       // ── TEMPORARY DEBUG ROUTE — remove after testing statusSync ──
