@@ -366,6 +366,15 @@ async function recordFailure({ env, dealerConfig, body, salesRef, edithResponse,
 }
 
 // ── Write success event to D1 ─────────────────────────────────
+//
+// Also stores vehicle year/make/model/condition and the applicant's split
+// first/last name + ID number — none of this used to be captured here,
+// but policy-sync-worker (a separate Worker) needs it to push a completed
+// policy to all four CRMs + the email digest for the case where Seriti
+// drops the lead from its feed entirely once it converts to a policy, so
+// no normal lead sync ever happens for that customer. applicant_name
+// (combined) is left in place unchanged alongside the new split columns —
+// nothing reads it that would break, and nothing needs migrating off it.
 
 function writePolicyEvent({ env, workerCtx, dealerConfig, body, salesRef, policyNumber, status, retryCount }) {
   if (!env.DB || !workerCtx) return;
@@ -375,8 +384,9 @@ function writePolicyEvent({ env, workerCtx, dealerConfig, body, salesRef, policy
       INSERT INTO policy_events (
         dealer_key, policy_number, applicant_id, sales_ref, branch_code, finance_type,
         status, applicant_name, applicant_mobile, applicant_email,
-        estimated_amount, retry_count
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        estimated_amount, retry_count, vehicle_year, vehicle_make, vehicle_model, vehicle_condition,
+        applicant_first_name, applicant_last_name, applicant_id_number
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `)
     .bind(
       dealerConfig.key,
@@ -391,6 +401,13 @@ function writePolicyEvent({ env, workerCtx, dealerConfig, body, salesRef, policy
       body.emailAddress || null,
       body.estimatedApprovalAmount || body.preQualTotal || null,
       retryCount || 0,
+      body.vehicleYear || null,
+      body.vehicleMake || null,
+      body.vehicleModel || null,
+      body.vehicleCondition || null,
+      body.firstName || null,
+      body.lastName || null,
+      body.idNumber || null,
     )
     .run()
     .catch(err => console.error('D1 write failed:', err.message))
