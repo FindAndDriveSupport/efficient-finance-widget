@@ -1,9 +1,14 @@
 /**
  * routes/vehicleStock.js
- * Vehicle stock lookups for Car Factory Outlet's live inventory
+ * Vehicle make/model dropdown lookups sourced from carfo's live inventory
  * (vehicle_stock table — vehicle_no, reg_no, year, make, model, mmcode).
- * No dealer/branch column on this table — it holds only carfo's stock,
- * so no WHERE-clause scoping is needed.
+ * No dealer/branch column on this table — it holds only carfo's stock, so
+ * no WHERE-clause scoping is needed.
+ *
+ * mmcode resolution for a chosen make+model still goes through the existing
+ * /api/vehicle-context/mmcode route (handleVehicleMmcodeLookup in
+ * vehicleContextResolve.js) — that already queries this same table
+ * correctly; nothing here duplicates it.
  */
 
 export async function handleVehicleStockMakes(request, ctx, jsonResponse) {
@@ -57,31 +62,6 @@ export async function handleVehicleStockModels(request, ctx, jsonResponse) {
     return jsonResponse({ results }, 200, origin, env);
   } catch (err) {
     console.error('Vehicle stock models lookup error:', err.message, err.stack);
-    return jsonResponse({ error: 'Lookup failed', details: err.message }, 500, origin, env);
-  }
-}
-
-export async function handleVehicleStockMmcode(request, ctx, jsonResponse) {
-  const { env, origin } = ctx;
-  const url = new URL(request.url);
-  const make = (url.searchParams.get('make') || '').trim();
-  const model = (url.searchParams.get('model') || '').trim();
-
-  if (!make || !model) {
-    return jsonResponse({ error: 'Missing required "make" and "model" query parameters' }, 400, origin, env);
-  }
-
-  try {
-    const row = await env.DB.prepare(
-      `SELECT mmcode FROM vehicle_stock WHERE make = ?1 AND model = ?2 AND mmcode IS NOT NULL LIMIT 1`
-    ).bind(make, model).first();
-
-    if (row?.mmcode) {
-      return jsonResponse({ resolved: true, mmcode: row.mmcode }, 200, origin, env);
-    }
-    return jsonResponse({ resolved: false }, 200, origin, env);
-  } catch (err) {
-    console.error('Vehicle stock mmcode lookup error:', err.message, err.stack);
     return jsonResponse({ error: 'Lookup failed', details: err.message }, 500, origin, env);
   }
 }
