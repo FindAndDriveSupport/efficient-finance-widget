@@ -14,6 +14,7 @@ import { handleAddressSearch }   from './routes/addressSearch.js';
 import { handleGetPolicies }     from './routes/getPolicies.js';
 import { handleLookups }         from './routes/lookups.js';
 import { handleVehicleContextResolve, handleVehicleMmcodeLookup } from './routes/vehicleContextResolve.js';
+import { handleVehicleStockMakes, handleVehicleStockModels } from './routes/vehicleStock.js';
 import { runStatusSync, runFullBackfill, runPerDealerBackfill, debugFetchStatusListXML, debugFetchPolicyDetailsXML } from './routes/statusSync.js';
 
 // ── CORS headers ──────────────────────────────────────────────
@@ -102,6 +103,12 @@ export default {
       }
       if (path === '/api/address-search' && method === 'GET') {
         return handleAddressSearch(request, ctx2, jsonResponse);
+      }
+      if (path === '/api/lookup/vehicle-stock-makes' && method === 'GET') {
+        return handleVehicleStockMakes(request, ctx2, jsonResponse);
+      }
+      if (path === '/api/lookup/vehicle-stock-models' && method === 'GET') {
+        return handleVehicleStockModels(request, ctx2, jsonResponse);
       }
       if (path.startsWith('/api/lookup/') && method === 'GET') {
         return handleLookups(request, ctx2, jsonResponse);
