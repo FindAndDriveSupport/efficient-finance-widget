@@ -1083,6 +1083,7 @@ export const DEALERS = {
     allowedDomains: [
       'carfo.co.za',
       'car-factory-outlet.seritifinance.findndrive.co.za',
+'car-factory-outlet.seritifinance.findndrive.co.za',
       'seritifinance.findndrive.co.za',
     ],
     theme: {
