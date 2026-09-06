@@ -1084,6 +1084,7 @@ export const DEALERS = {
       'carfo.co.za',
       'car-factory-outlet.seritifinance.findndrive.co.za',
 'car-factory-outlet.seritifinance.findndrive.co.za',
+'e-fficient-ui-standalone-application.still-fire-1c3d.workers.dev',
       'seritifinance.findndrive.co.za',
     ],
     theme: {
