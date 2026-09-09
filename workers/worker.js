@@ -15,6 +15,7 @@ import { handleGetPolicies }     from './routes/getPolicies.js';
 import { handleLookups }         from './routes/lookups.js';
 import { handleVehicleContextResolve, handleVehicleMmcodeLookup } from './routes/vehicleContextResolve.js';
 import { handleVehicleStockMakes, handleVehicleStockModels } from './routes/vehicleStock.js';
+import { handlePartialLead } from './routes/partialLead.js';
 import { runStatusSync, runFullBackfill, runPerDealerBackfill, debugFetchStatusListXML, debugFetchPolicyDetailsXML } from './routes/statusSync.js';
 
 // ── CORS headers ──────────────────────────────────────────────
@@ -121,6 +122,9 @@ export default {
       }
       if (path === '/api/policy/documents' && method === 'POST') {
         return handleSubmitDocuments(request, ctx2, jsonResponse);
+      }
+      if (path === '/api/leads/partial' && method === 'POST') {
+        return handlePartialLead(request, ctx2, jsonResponse);
       }
       if (path === '/api/policies' && method === 'GET') {
         return handleGetPolicies(request, ctx2, jsonResponse);
