@@ -5,18 +5,15 @@
  * queue-worker's confirmed POST /process-lead contract for CRM delivery
  * (DealerOS).
  *
- * ⚠️ STILL UNCONFIRMED: KV binding name is confirmed as LEADS_SYNC_CONFIG
- * (id 352dc4a8e9244b88b315a12590fd6a1a), but the exact KEY FORMAT within
- * it for DealerOS credentials is not yet confirmed — the two-key pattern
- * below (DEALEROS_TOKEN_/DEALEROS_DEALERSHIP_ID_) mirrors Seriti's naming
- * convention as a best guess, but this KV may instead store one combined
- * JSON blob per dealer, or use different key names entirely. queue-worker's
- * file header also states dealer destinations are normally built by
- * cron-worker's dispatch stage — reusing that function directly (if
- * accessible) would be more reliable than this standalone lookup. Confirm
- * against the real KV contents (dashboard → Workers & Pages → KV →
- * LEADS_SYNC_CONFIG → browse keys for car-factory-outlet) before trusting
- * this in production.
+ * KV binding: LEADS_SYNC_CONFIG. One JSON record per dealer, keyed by the
+ * dealer's key (e.g. "car-factory-outlet"), containing a `destinations`
+ * array — confirmed shape:
+ * {
+ *   key, groupKey, branchCode, seritiApiKey, seritiApiSecret,
+ *   seritiDealershipId, startDate, kredoEnabled, kredoUsername,
+ *   kredoPassword, kredoXApiKey,
+ *   destinations: [{ dealerosToken, dealershipId, enquiryMethod, leadSource, type }]
+ * }
  */
 
 export async function handlePartialLead(request, ctx, jsonResponse) {
@@ -24,27 +21,41 @@ export async function handlePartialLead(request, ctx, jsonResponse) {
   const body = await request.json();
   const { dealerKey, firstName, lastName, idNumber, mobileNumber, vehicleMake, vehicleModel } = body;
 
-  // ⚠️ PLACEHOLDER key format — see file header.
-  const dealerosToken = await env.LEADS_SYNC_CONFIG?.get(`DEALEROS_TOKEN_${dealerKey}`);
-  const dealershipId  = await env.LEADS_SYNC_CONFIG?.get(`DEALEROS_DEALERSHIP_ID_${dealerKey}`);
-
-  if (!dealerosToken || !dealershipId) {
+  const raw = await env.LEADS_SYNC_CONFIG?.get(dealerKey);
+  if (!raw) {
     console.error(JSON.stringify({
       level: 'error',
-      type: 'partial_lead_dealeros_creds_missing',
+      type: 'partial_lead_dealer_config_missing',
       dealerKey,
       ts: new Date().toISOString(),
     }));
     return new Response(null, { status: 202 }); // sendBeacon has no client-side error handling anyway
   }
 
-  const dest = {
-    type: 'dealeros', // ⚠️ unconfirmed value
-    dealerosToken,
-    dealershipId,
-    leadSource: 'DEALER_WEBSITE_ORGANIC',
-    enquiryMethod: 'WEBSITE',
-  };
+  let dealerRecord;
+  try {
+    dealerRecord = JSON.parse(raw);
+  } catch (err) {
+    console.error(JSON.stringify({
+      level: 'error',
+      type: 'partial_lead_dealer_config_parse_failed',
+      dealerKey,
+      error: err.message,
+      ts: new Date().toISOString(),
+    }));
+    return new Response(null, { status: 202 });
+  }
+
+  const dest = (dealerRecord.destinations || []).find(d => d.type === 'dealeros');
+  if (!dest) {
+    console.error(JSON.stringify({
+      level: 'error',
+      type: 'partial_lead_dealeros_dest_missing',
+      dealerKey,
+      ts: new Date().toISOString(),
+    }));
+    return new Response(null, { status: 202 });
+  }
 
   const lead = {
     firstName,
@@ -56,8 +67,6 @@ export async function handlePartialLead(request, ctx, jsonResponse) {
     date: new Date().toISOString().slice(0, 10),
   };
 
-  // Matches queue-worker's confirmed contract: POST /process-lead with
-  // { dealerKey, branchCode, intent, lead, approvalChance, destinations }.
   ctx.waitUntil(
     env.QUEUE_WORKER.fetch('https://internal/process-lead', {
       method: 'POST',
