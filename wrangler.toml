@@ -10,6 +10,14 @@ tail_consumers = [{ service = "alert-worker" }]
 binding  = "SERITI_CACHE"
 id       = "16c7bf807bc0445ab0420a16f2352c0d"
 
+[[kv_namespaces]]
+binding  = "LEADS_SYNC_CONFIG"
+id       = "352dc4a8e9244b88b315a12590fd6a1a"
+
+[[services]]
+binding = "QUEUE_WORKER"
+service = "queue-worker"
+
 [vars]
 WORKER_ENV = "production"
 
@@ -32,4 +40,3 @@ WORKER_ENV = "development"
 # Daily Edith policy status sync — runs at 02:00 UTC
 [triggers]
 crons = ["0 2 * * *"]
-
