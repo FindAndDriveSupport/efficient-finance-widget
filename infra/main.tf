@@ -17,16 +17,16 @@ resource "cloudflare_ruleset" "dealer_widget_rate_limit" {
   phase   = "http_ratelimit"
 
   rules {
-    action     = "block"
+    action     = "managed_challenge"
     expression = "(http.request.method eq \"POST\" and http.request.uri.path in {\"/\" \"/en\"} and any(http.request.headers[\"next-action\"][*] ne \"\"))"
 
     ratelimit {
       characteristics     = ["ip.src"]
-      period              = 10
-      requests_per_period = 5
-      mitigation_timeout  = 3600
+      period              = 30
+      requests_per_period = 15
+      mitigation_timeout  = 600
     }
 
-    description = "Block bots hammering Server Action endpoints across all dealer frontend Workers"
+    description = "Managed-challenge bots hammering Server Action endpoints across all dealer frontend Workers"
   }
 }
