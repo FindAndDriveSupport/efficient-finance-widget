@@ -23,7 +23,7 @@ resource "cloudflare_ruleset" "dealer_widget_rate_limit" {
     expression = "(http.request.method eq \"POST\" and http.request.uri.path in {\"/\" \"/en\"} and any(http.request.headers[\"next-action\"][*] ne \"\"))"
 
     ratelimit {
-      characteristics     = ["ip.src"]
+      characteristics     = ["ip.src", "cf.colo.id"]
       period              = 30
       requests_per_period = 15
       mitigation_timeout  = 600
@@ -47,19 +47,13 @@ resource "cloudflare_ruleset" "block_scanner_paths" {
   }
 }
 
-# --- Zone-wide bot heuristics ---
+# --- Zone-wide security level ---
 resource "cloudflare_zone_settings_override" "bot_protection" {
   zone_id = var.cloudflare_zone_id
 
   settings {
     security_level = "medium"
   }
-}
-
-resource "cloudflare_bot_management" "this" {
-  zone_id    = var.cloudflare_zone_id
-  fight_mode = true
-  enable_js  = true
 }
 
 # --- Cloudflare-managed WAF ruleset (SQLi, RCE, path traversal, etc.) ---
@@ -69,12 +63,4 @@ resource "cloudflare_ruleset" "waf_managed" {
   kind    = "zone"
   phase   = "http_request_firewall_managed"
 
-  rules {
-    action = "execute"
-    action_parameters {
-      id = "efb7b8c949ac4650a09736fc376e9aee" # Cloudflare Managed Ruleset
-    }
-    expression  = "true"
-    description = "Run Cloudflare's managed ruleset against all traffic"
-  }
-}
+  rules
