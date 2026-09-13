@@ -14,6 +14,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: hashicorp/setup-terraform@v3
+
+      - name: Debug token length
+        run: echo "Token length: ${#TF_VAR_cloudflare_api_token}"
+        env:
+          TF_VAR_cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+
       - run: terraform init
       - run: terraform plan
         env:
