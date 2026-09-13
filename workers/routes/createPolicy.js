@@ -72,6 +72,8 @@ export async function handleCreatePolicy(request, ctx, jsonResponse) {
       occupation: body.occupation || null,
       occupationLevel: body.occupationLevel || null,
       industry: body.industry || null,
+      workTelephoneCode: body.workTelephoneCode || null,
+      workTelephoneNumber: body.workTelephoneNumber ? '✓' : null,
       basicSalary: body.basicSalary ? '✓' : null,
       nettSalary: body.nettSalary ? '✓' : null,
       depositAmount: body.depositAmount ? '✓' : null,
@@ -523,6 +525,15 @@ function buildEdithXML(data, companyCode, companyPass, dealer, salesRef) {
         </tem:Product>
       </tem:Products>` : '';
 
+  // Work telephone code/number, per Edith Policy Webservices v312.19 (Person
+  // object): WorkTelephoneCode must be numeric only, 3-4 digits, starting
+  // with 0 (e.g. "011"); WorkTelephoneNumber must be numeric only, 7 digits
+  // (e.g. "4470652"). Stripped here the same way mobile numbers are
+  // stripped before being sent, so formatted input like "(011) 447-0652"
+  // doesn't get silently ignored/errored by Edith's validation.
+  const workTelCodeDigits = d.workTelephoneCode ? stripNonDigits(d.workTelephoneCode) : '';
+  const workTelNumberDigits = d.workTelephoneNumber ? stripNonDigits(d.workTelephoneNumber) : '';
+
   return `<?xml version="1.0" encoding="utf-8"?>
 <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tem="http://ws.edith.co.za/EdithServices/PolicyServicesV300">
   <soap:Body>
@@ -591,6 +602,8 @@ function buildEdithXML(data, companyCode, companyPass, dealer, salesRef) {
           ${d.occupation     ? `<tem:Occupation>${esc(d.occupation)}</tem:Occupation>` : ''}
           ${d.occupationLevel ? `<tem:OccupationLevel>${esc(d.occupationLevel)}</tem:OccupationLevel>` : ''}
           ${d.industry       ? `<tem:Industry>${esc(d.industry)}</tem:Industry>` : ''}
+          ${workTelCodeDigits   ? `<tem:WorkTelephoneCode>${esc(workTelCodeDigits)}</tem:WorkTelephoneCode>` : ''}
+          ${workTelNumberDigits ? `<tem:WorkTelephoneNumber>${esc(workTelNumberDigits)}</tem:WorkTelephoneNumber>` : ''}
           ${d.currentEmploymentStartDate ? `<tem:CurrentEmploymentStartDate>${esc(d.currentEmploymentStartDate)}</tem:CurrentEmploymentStartDate>` : ''}
           ${d.salaryDay && Number(d.salaryDay) >= 1 && Number(d.salaryDay) <= 31 ? `<tem:SalaryDay>${Number(d.salaryDay)}</tem:SalaryDay>` : ''}
           ${d.basicSalary    ? `<tem:BasicSalary>${Number(d.basicSalary).toFixed(2)}</tem:BasicSalary>` : ''}
@@ -633,6 +646,19 @@ function normaliseMobile(mobile) {
   if (digits.startsWith('27') && digits.length === 11) return '0' + digits.slice(2);
   if (digits.startsWith('0') && digits.length === 10) return digits;
   return digits; // return as-is and let Edith validate
+}
+
+/**
+ * Strips all non-digit characters from a value. Used for WorkTelephoneCode
+ * and WorkTelephoneNumber, which Edith requires as numeric-only (see Person
+ * object, Edith Policy Webservices v312.19) but which may arrive from the
+ * frontend formatted (e.g. "(011) 447-0652" or "011-447-0652").
+ * No country-code handling here (unlike normaliseMobile) since work
+ * telephone numbers are always local SA numbers, not mobile numbers that
+ * might arrive with a +27 prefix.
+ */
+function stripNonDigits(value) {
+  return String(value).replace(/\D/g, '');
 }
 
 function generateSalesRef(branchCode) {
