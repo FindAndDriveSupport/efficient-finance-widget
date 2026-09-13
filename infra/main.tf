@@ -11,6 +11,7 @@ provider "cloudflare" {
   api_token = var.cloudflare_api_token
 }
 
+# --- Rate limit: bot spam on Next.js Server Action endpoints ---
 resource "cloudflare_ruleset" "dealer_widget_rate_limit" {
   zone_id = var.cloudflare_zone_id
   name    = "Dealer widget bot rate limit"
@@ -31,14 +32,47 @@ resource "cloudflare_ruleset" "dealer_widget_rate_limit" {
   }
 }
 
-resource "cloudflare_ruleset" "block_php_scanners" {
+# --- Block known scanner path signatures (no PHP/WP/git/env anywhere in this stack) ---
+resource "cloudflare_ruleset" "block_scanner_paths" {
   zone_id = var.cloudflare_zone_id
-  name    = "Block PHP scanner probes"
+  name    = "Block common scanner probes"
   phase   = "http_request_firewall_custom"
 
   rules {
     action      = "block"
-    expression  = "(ends_with(http.request.uri.path, \".php\"))"
-    description = "Block requests for .php paths — stack has no PHP anywhere, so these are always scanners"
+    expression  = "(ends_with(http.request.uri.path, \".php\") or http.request.uri.path contains \"/wp-\" or http.request.uri.path contains \"/.env\" or http.request.uri.path contains \"/.git\" or http.request.uri.path contains \"/xmlrpc\" or http.request.uri.path contains \"/phpmyadmin\")"
+    description = "Block requests for PHP/WordPress/git/env paths — stack has none of these, so they're always scanners"
+  }
+}
+
+# --- Zone-wide bot heuristics ---
+resource "cloudflare_zone_settings_override" "bot_protection" {
+  zone_id = var.cloudflare_zone_id
+
+  settings {
+    security_level = "medium"
+  }
+}
+
+resource "cloudflare_bot_management" "this" {
+  zone_id            = var.cloudflare_zone_id
+  fight_mode         = true
+  enable_js          = true
+  using_latest_model = true
+}
+
+# --- Cloudflare-managed WAF ruleset (SQLi, RCE, path traversal, etc.) ---
+resource "cloudflare_ruleset" "waf_managed" {
+  zone_id = var.cloudflare_zone_id
+  name    = "Cloudflare Managed WAF"
+  phase   = "http_request_firewall_managed"
+
+  rules {
+    action = "execute"
+    action_parameters {
+      id = "efb7b8c949ac4650a09736fc376e9aee" # Cloudflare Managed Ruleset
+    }
+    expression  = "true"
+    description = "Run Cloudflare's managed ruleset against all traffic"
   }
 }
