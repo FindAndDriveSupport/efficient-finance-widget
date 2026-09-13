@@ -3,7 +3,7 @@ name: Cloudflare Infra
 on:
   push:
     branches: [main]
-    paths: ["infra/**"]
+  workflow_dispatch: {}
 
 jobs:
   terraform:
