@@ -19,7 +19,7 @@ resource "cloudflare_ruleset" "dealer_widget_rate_limit" {
 
   rules {
     action     = "managed_challenge"
-    expression = "(http.request.method eq \"POST\" and http.request.uri.path in {\"/\" \"/en\"} and any(http.request.headers[\"next-action\"][*] ne \"\"))"
+    expression = "(http.request.method eq \"POST\" and http.request.uri.path in {\"/\" \"/en\"})"
 
     ratelimit {
       characteristics     = ["ip.src", "cf.colo.id"]
