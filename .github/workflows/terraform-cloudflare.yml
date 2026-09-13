@@ -16,7 +16,7 @@ jobs:
       - uses: hashicorp/setup-terraform@v3
 
       - name: Debug token length
-        run: echo "Token length: ${#TF_VAR_cloudflare_api_token}"
+        run: printf '%s' "$TF_VAR_cloudflare_api_token" | wc -c
         env:
           TF_VAR_cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 
