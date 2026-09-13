@@ -40,8 +40,8 @@ resource "cloudflare_ruleset" "block_scanner_paths" {
 
   rules {
     action      = "block"
-    expression  = "(ends_with(http.request.uri.path, \".php\") or http.request.uri.path contains \"/wp-\" or http.request.uri.path contains \"/.env\" or http.request.uri.path contains \"/.git\" or http.request.uri.path contains \"/xmlrpc\" or http.request.uri.path contains \"/phpmyadmin\" or http.request.uri.path contains \"/getInitData\")"
-    description = "Block requests for PHP/WordPress/git/env paths and known probed non-existent endpoints - stack has none of these, so they're always scanners"
+    expression  = "(ends_with(http.request.uri.path, \".php\") or http.request.uri.path contains \"/wp-\" or http.request.uri.path contains \"/.env\" or http.request.uri.path contains \"/.git\" or http.request.uri.path contains \"/xmlrpc\" or http.request.uri.path contains \"/phpmyadmin\" or http.request.uri.path contains \"/getInitData\" or http.request.uri.path contains \"/graphql\" or http.request.uri.path contains \"/api/gql\" or http.request.uri.path contains \"/v2/_catalog\")"
+    description = "Block requests for PHP/WordPress/git/env/GraphQL/registry paths and known probed non-existent endpoints - stack has none of these, so they're always scanners"
   }
 }
 
