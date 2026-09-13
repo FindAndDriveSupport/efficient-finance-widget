@@ -15,6 +15,7 @@ provider "cloudflare" {
 resource "cloudflare_ruleset" "dealer_widget_rate_limit" {
   zone_id = var.cloudflare_zone_id
   name    = "Dealer widget bot rate limit"
+  kind    = "zone"
   phase   = "http_ratelimit"
 
   rules {
@@ -36,6 +37,7 @@ resource "cloudflare_ruleset" "dealer_widget_rate_limit" {
 resource "cloudflare_ruleset" "block_scanner_paths" {
   zone_id = var.cloudflare_zone_id
   name    = "Block common scanner probes"
+  kind    = "zone"
   phase   = "http_request_firewall_custom"
 
   rules {
@@ -55,16 +57,16 @@ resource "cloudflare_zone_settings_override" "bot_protection" {
 }
 
 resource "cloudflare_bot_management" "this" {
-  zone_id            = var.cloudflare_zone_id
-  fight_mode         = true
-  enable_js          = true
-  using_latest_model = true
+  zone_id    = var.cloudflare_zone_id
+  fight_mode = true
+  enable_js  = true
 }
 
 # --- Cloudflare-managed WAF ruleset (SQLi, RCE, path traversal, etc.) ---
 resource "cloudflare_ruleset" "waf_managed" {
   zone_id = var.cloudflare_zone_id
   name    = "Cloudflare Managed WAF"
+  kind    = "zone"
   phase   = "http_request_firewall_managed"
 
   rules {
