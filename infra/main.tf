@@ -32,7 +32,7 @@ resource "cloudflare_ruleset" "dealer_widget_rate_limit" {
   }
 }
 
-# --- Block known scanner path signatures (no PHP/WP/git/env anywhere in this stack) ---
+# --- Block known scanner path signatures ---
 resource "cloudflare_ruleset" "block_scanner_paths" {
   zone_id = var.cloudflare_zone_id
   name    = "Block common scanner probes"
@@ -40,8 +40,8 @@ resource "cloudflare_ruleset" "block_scanner_paths" {
 
   rules {
     action      = "block"
-    expression  = "(ends_with(http.request.uri.path, \".php\") or http.request.uri.path contains \"/wp-\" or http.request.uri.path contains \"/.env\" or http.request.uri.path contains \"/.git\" or http.request.uri.path contains \"/xmlrpc\" or http.request.uri.path contains \"/phpmyadmin\")"
-    description = "Block requests for PHP/WordPress/git/env paths — stack has none of these, so they're always scanners"
+    expression  = "(ends_with(http.request.uri.path, \".php\") or http.request.uri.path contains \"/wp-\" or http.request.uri.path contains \"/.env\" or http.request.uri.path contains \"/.git\" or http.request.uri.path contains \"/xmlrpc\" or http.request.uri.path contains \"/phpmyadmin\" or http.request.uri.path contains \"/getInitData\")"
+    description = "Block requests for PHP/WordPress/git/env paths and known probed non-existent endpoints — stack has none of these, so they're always scanners"
   }
 }
 
