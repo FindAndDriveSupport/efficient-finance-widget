@@ -22,6 +22,16 @@ jobs:
           printf %s "$TF_VAR_cloudflare_api_token" | wc -c
 
       - run: terraform init
+
+      - name: Get existing ruleset IDs
+        run: |
+          echo "Custom firewall ruleset:"
+          curl -s -X GET "https://api.cloudflare.com/client/v4/zones/${{ secrets.CLOUDFLARE_ZONE_ID }}/rulesets/phases/http_request_firewall_custom/entrypoint" \
+            -H "Authorization: Bearer ${{ secrets.CLOUDFLARE_WAF_API_TOKEN }}" | grep -o '"id":"[^"]*"' | head -1
+          echo "Managed firewall ruleset:"
+          curl -s -X GET "https://api.cloudflare.com/client/v4/zones/${{ secrets.CLOUDFLARE_ZONE_ID }}/rulesets/phases/http_request_firewall_managed/entrypoint" \
+            -H "Authorization: Bearer ${{ secrets.CLOUDFLARE_WAF_API_TOKEN }}" | grep -o '"id":"[^"]*"' | head -1
+
       - run: terraform plan
         env:
           TF_VAR_cloudflare_api_token: ${{ secrets.CLOUDFLARE_WAF_API_TOKEN }}
