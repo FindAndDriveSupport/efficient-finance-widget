@@ -11,7 +11,6 @@ provider "cloudflare" {
   api_token = var.cloudflare_api_token
 }
 
-# --- Rate limit: bot spam on Next.js Server Action endpoints ---
 resource "cloudflare_ruleset" "dealer_widget_rate_limit" {
   zone_id = var.cloudflare_zone_id
   name    = "Dealer widget bot rate limit"
@@ -33,7 +32,6 @@ resource "cloudflare_ruleset" "dealer_widget_rate_limit" {
   }
 }
 
-# --- Block known scanner path signatures ---
 resource "cloudflare_ruleset" "block_scanner_paths" {
   zone_id = var.cloudflare_zone_id
   name    = "Block common scanner probes"
@@ -43,11 +41,10 @@ resource "cloudflare_ruleset" "block_scanner_paths" {
   rules {
     action      = "block"
     expression  = "(ends_with(http.request.uri.path, \".php\") or http.request.uri.path contains \"/wp-\" or http.request.uri.path contains \"/.env\" or http.request.uri.path contains \"/.git\" or http.request.uri.path contains \"/xmlrpc\" or http.request.uri.path contains \"/phpmyadmin\" or http.request.uri.path contains \"/getInitData\")"
-    description = "Block requests for PHP/WordPress/git/env paths and known probed non-existent endpoints — stack has none of these, so they're always scanners"
+    description = "Block requests for PHP/WordPress/git/env paths and known probed non-existent endpoints - stack has none of these, so they're always scanners"
   }
 }
 
-# --- Zone-wide security level ---
 resource "cloudflare_zone_settings_override" "bot_protection" {
   zone_id = var.cloudflare_zone_id
 
@@ -56,11 +53,18 @@ resource "cloudflare_zone_settings_override" "bot_protection" {
   }
 }
 
-# --- Cloudflare-managed WAF ruleset (SQLi, RCE, path traversal, etc.) ---
 resource "cloudflare_ruleset" "waf_managed" {
   zone_id = var.cloudflare_zone_id
   name    = "Cloudflare Managed WAF"
   kind    = "zone"
   phase   = "http_request_firewall_managed"
 
-  rules
+  rules {
+    action = "execute"
+    action_parameters {
+      id = "efb7b8c949ac4650a09736fc376e9aee"
+    }
+    expression  = "true"
+    description = "Run Cloudflare managed ruleset against all traffic"
+  }
+}
