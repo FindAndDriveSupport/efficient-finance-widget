@@ -30,3 +30,15 @@ resource "cloudflare_ruleset" "dealer_widget_rate_limit" {
     description = "Managed-challenge bots hammering Server Action endpoints across all dealer frontend Workers"
   }
 }
+
+resource "cloudflare_ruleset" "block_php_scanners" {
+  zone_id = var.cloudflare_zone_id
+  name    = "Block PHP scanner probes"
+  phase   = "http_request_firewall_custom"
+
+  rules {
+    action      = "block"
+    expression  = "(ends_with(http.request.uri.path, \".php\"))"
+    description = "Block requests for .php paths — stack has no PHP anywhere, so these are always scanners"
+  }
+}
