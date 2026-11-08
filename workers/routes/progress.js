@@ -87,9 +87,13 @@ export async function handleTrackProgress(request, ctx, jsonResponse) {
   try { body = await request.json(); } catch { return jsonResponse({ ok: false }, 400, origin, env); }
   if (!body || typeof body !== 'object' || Array.isArray(body)) return jsonResponse({ ok: false }, 400, origin, env);
 
+  // The router always resolves a dealerConfig (falling back to 'default'), so prefer the
+  // dealer the app sent when the resolved one is only the default.
+  const resolvedDealer = dealerConfig?.key && dealerConfig.key !== 'default' ? dealerConfig.key : null;
+
   const ok = await recordProgressEvent(env, {
     sessionId: body.sessionId,
-    dealerKey: dealerConfig?.key || body.dealer,
+    dealerKey: resolvedDealer || body.dealer,
     stepIndex: body.stepIndex,
     step: body.step,
     event: body.event || 'entered',
