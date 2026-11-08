@@ -11,6 +11,10 @@
  *   - On exhausted retries → record in D1 policy_events, email dealer, return success to user
  *   - Edith system errors (500 response) → record in D1, email dealer, return success to user
  *
+ * Optional fields (race, education, expenses, bank account on non-bike deals)
+ * never block a policy: bad values are cleaned up before sending, and if Edith
+ * still rejects ONLY optional fields the request is re-sent once without them.
+ *
  * On any real success (clean or with warnings), fires a fire-and-forget
  * call to Seriti's applicant/{id}/complete endpoint to mark the lead as
  * fully converted. This never blocks or alters the user's response.
@@ -34,6 +38,10 @@ export async function handleCreatePolicy(request, ctx, jsonResponse) {
   let body;
   try { body = await request.json(); }
   catch { return jsonResponse({ error: 'Invalid JSON body' }, 400, origin, env); }
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return jsonResponse({ error: 'Invalid JSON body' }, 400, origin, env);
+  }
+  body = sanitizeOptionalFields(body, dealerConfig.financeType === 'bike');
 
   // Select Edith credentials and WSDL URL based on dealer's edithEnv
   const isProd = dealerConfig.edithEnv === 'prod';
@@ -86,9 +94,11 @@ export async function handleCreatePolicy(request, ctx, jsonResponse) {
       bankBranchCode: body.bankBranchCode || null,
       accountType: body.accountType || null,
       accountNumber: body.bankAccountNumber ? '✓' : null,
+      ethnicGroup: body.ethnicGroup || null,
       nextOfKinFirst: body.nextOfKinFirstName ? '✓' : null,
       nextOfKinLast: body.nextOfKinLastName ? '✓' : null,
       nextOfKinMobile: body.nextOfKinMobile ? '✓' : null,
+      nextOfKinEmail: body.nextOfKinEmail ? '✓' : null,
       dataAttestation: body.dataAttestation ? '✓' : null,
       financialAccessConsent: body.financialAccessConsent ? '✓' : null,
     },
@@ -109,38 +119,8 @@ export async function handleCreatePolicy(request, ctx, jsonResponse) {
   }));
 
   // ── Fetch with retry (network failures only) ──────────────────
-  let rawText = null;
-  let fetchStatus = null;
-  let networkFailure = false;
-  let retryCount = 0;
-
-  for (let attempt = 0; attempt < RETRY_LIMIT; attempt++) {
-    try {
-      const res = await fetch(wsdlUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'text/xml; charset=utf-8',
-          'SOAPAction': 'http://ws.edith.co.za/EdithServices/PolicyServicesV300/CreatePolicy',
-        },
-        body: xml,
-      });
-      rawText = await res.text();
-      fetchStatus = res.status;
-      networkFailure = false;
-      retryCount = attempt;
-      break;
-    } catch (err) {
-      retryCount = attempt + 1;
-      networkFailure = true;
-      logError('edith_network_error', { message: err.message, attempt: attempt + 1 }, env, {
-        salesRef,
-        dealerKey: dealerConfig.key,
-      });
-      if (attempt < RETRY_LIMIT - 1) {
-        await sleep(RETRY_DELAY_MS);
-      }
-    }
-  }
+  let { rawText, fetchStatus, networkFailure, retryCount } =
+    await postToEdith({ wsdlUrl, xml, env, dealerConfig, salesRef });
 
   // ── All retries exhausted — genuine network failure ───────────
   if (networkFailure) {
@@ -183,7 +163,7 @@ export async function handleCreatePolicy(request, ctx, jsonResponse) {
     ts: new Date().toISOString(),
   }));
 
-  const edithResponse = parseEdithXMLResponse(rawText);
+  let edithResponse = parseEdithXMLResponse(rawText);
 
   console.log(JSON.stringify({
     level: 'info',
@@ -194,6 +174,36 @@ export async function handleCreatePolicy(request, ctx, jsonResponse) {
     errorCount: edithResponse.errors.length,
     ts: new Date().toISOString(),
   }));
+
+  // ── Optional-field fallback ───────────────────────────────────
+  // If Edith rejected the application ONLY because of optional fields
+  // (race, education, expenses, bank details on non-bike deals), re-send once
+  // without them so the policy is still created.
+  let droppedFields = [];
+  const droppable = getDroppableFields(edithResponse, dealerConfig.financeType === 'bike');
+  if (droppable.length > 0) {
+    logWarning('edith_optional_fields_dropped', { fields: droppable }, env, { salesRef, dealerKey: dealerConfig.key });
+    const second = await postToEdith({
+      wsdlUrl, xml: stripFields(xml, droppable), env, dealerConfig, salesRef,
+    });
+    if (!second.networkFailure) {
+      rawText = second.rawText;
+      fetchStatus = second.fetchStatus;
+      retryCount = (retryCount || 0) + 1 + (second.retryCount || 0);
+      edithResponse = parseEdithXMLResponse(rawText);
+      droppedFields = droppable;
+      console.log(JSON.stringify({
+        level: 'info',
+        type: 'edith_parsed_after_dropping_optional',
+        salesRef,
+        statusCode: edithResponse.statusCode,
+        policyNumber: edithResponse.policyNumber,
+        errorCount: edithResponse.errors.length,
+        droppedFields,
+        ts: new Date().toISOString(),
+      }));
+    }
+  }
 
   // ── Edith system-level error (500) ────────────────────────────
   if (edithResponse.statusCode === 500) {
@@ -285,6 +295,7 @@ export async function handleCreatePolicy(request, ctx, jsonResponse) {
       policyNumber: edithResponse.policyNumber,
       salesRef,
       warnings,
+      ...(droppedFields.length ? { optionalFieldsDropped: droppedFields } : {}),
       code: 200,
     }, 200, origin, env);
   }
@@ -315,8 +326,164 @@ export async function handleCreatePolicy(request, ctx, jsonResponse) {
     success: true,
     policyNumber,
     salesRef,
-    code: 100,
+    ...(droppedFields.length ? { optionalFieldsDropped: droppedFields } : {}),
+    code: droppedFields.length ? 200 : 100,
   }, 200, origin, env);
+}
+
+// ── Edith POST with network retry ─────────────────────────────
+
+async function postToEdith({ wsdlUrl, xml, env, dealerConfig, salesRef }) {
+  let rawText = null;
+  let fetchStatus = null;
+  let networkFailure = false;
+  let retryCount = 0;
+
+  for (let attempt = 0; attempt < RETRY_LIMIT; attempt++) {
+    try {
+      const res = await fetch(wsdlUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'text/xml; charset=utf-8',
+          'SOAPAction': 'http://ws.edith.co.za/EdithServices/PolicyServicesV300/CreatePolicy',
+        },
+        body: xml,
+      });
+      rawText = await res.text();
+      fetchStatus = res.status;
+      networkFailure = false;
+      retryCount = attempt;
+      break;
+    } catch (err) {
+      retryCount = attempt + 1;
+      networkFailure = true;
+      logError('edith_network_error', { message: err.message, attempt: attempt + 1 }, env, {
+        salesRef,
+        dealerKey: dealerConfig.key,
+      });
+      if (attempt < RETRY_LIMIT - 1) {
+        await sleep(RETRY_DELAY_MS);
+      }
+    }
+  }
+  return { rawText, fetchStatus, networkFailure, retryCount };
+}
+
+// ── Optional fields ───────────────────────────────────────────
+//
+// Fields the standalone application adds on top of the core application.
+// None of them may block policy creation.
+
+const ETHNIC_GROUPS = new Set(['ASIAN', 'BLACK', 'COLOURED', 'INDIAN', 'WHITE']);
+const ACCOUNT_TYPES = new Set(['CHEQUE', 'SAVINGS', 'TRANSMISSION']);
+
+const OPTIONAL_MONEY_FIELDS = [
+  'monthlyRentExpense', 'monthlyFoodExpense', 'monthlyOtherExpense', 'loanRepayments', 'vehicleRepayments',
+  'insurancePayments', 'municipalPayments', 'creditCardPayments', 'furnitureAccountPayments',
+  'clothingAccountPayments', 'overdraftPayments', 'telephonePayments', 'transportCosts', 'educationCosts',
+  'childMaintenance', 'householdExpenses', 'securityPayments',
+];
+
+/**
+ * Cleans optional values BEFORE they are sent (bank details are left untouched for bike deals): anything missing or malformed is
+ * removed rather than sent to Edith. Returns a shallow copy; required fields
+ * (name, ID, etc.) are never touched here.
+ */
+function sanitizeOptionalFields(input, isBike = false) {
+  const b = { ...input };
+
+  if (b.ethnicGroup != null) {
+    const v = String(b.ethnicGroup).trim().toUpperCase();
+    if (ETHNIC_GROUPS.has(v)) b.ethnicGroup = v; else delete b.ethnicGroup;
+  }
+
+  for (const k of OPTIONAL_MONEY_FIELDS) {
+    if (b[k] == null || b[k] === '') { delete b[k]; continue; }
+    const n = Number(b[k]);
+    if (Number.isFinite(n) && n > 0) b[k] = n; else delete b[k];
+  }
+
+  if (b.otherPaymentsDescription != null) {
+    const v = String(b.otherPaymentsDescription).trim().slice(0, 100);
+    if (v) b.otherPaymentsDescription = v; else delete b.otherPaymentsDescription;
+  }
+
+  if (b.nextOfKinEmail != null) {
+    const v = String(b.nextOfKinEmail).trim();
+    if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) b.nextOfKinEmail = v.slice(0, 100); else delete b.nextOfKinEmail;
+  }
+
+  // Bank details: a bank account needs a valid 6-digit branch code to be sent at
+  // all; otherwise drop the whole block. A bad account type / number is dropped
+  // individually.
+  // Bike deals are left exactly as received: the debit-order account is essential
+  // there, so Edith's own validation must still reach the applicant.
+  const branch = b.bankBranchCode != null ? String(b.bankBranchCode).replace(/\D/g, '') : '';
+  if (isBike) {
+    // unchanged
+  } else if (/^\d{6}$/.test(branch)) {
+    b.bankBranchCode = branch;
+    const type = b.accountType != null ? String(b.accountType).trim().toUpperCase() : '';
+    if (ACCOUNT_TYPES.has(type)) b.accountType = type; else delete b.accountType;
+    const acc = b.bankAccountNumber != null ? String(b.bankAccountNumber).replace(/\D/g, '') : '';
+    if (acc && acc.length <= 20) b.bankAccountNumber = acc; else delete b.bankAccountNumber;
+  } else {
+    delete b.bankBranchCode;
+    delete b.accountType;
+    delete b.bankAccountNumber;
+  }
+
+  return b;
+}
+
+// Edith element names (lower-case) that may be dropped if Edith rejects them.
+const OPTIONAL_EDITH_FIELDS = new Set([
+  'ethnicgroup', 'educationlevel', 'otherpaymentsdescription',
+  'loanrepayments', 'vehiclerepayments', 'insurancepayments', 'municipalpayments', 'bondrentpayments',
+  'creditcardpayments', 'furnitureaccountpayments', 'clothingaccountpayments', 'overdraftpayments',
+  'telephonepayments', 'transportcosts', 'foodentertainmentcosts', 'educationcosts', 'childmaintenance',
+  'householdexpenses', 'otherpayments', 'securitypayments',
+]);
+// Bank account fields are optional too — except on bike deals, where the
+// debit-order account is essential and a bad value must still reach the user.
+const OPTIONAL_BANK_FIELDS = new Set([
+  'bankaccounts', 'bankaccount', 'accountnumber', 'accounttype', 'bankbranchcode',
+  'accountholdername', 'primaryaccountind', 'creditcardtype',
+]);
+
+function fieldKey(name) {
+  return String(name || '').replace(/\[[^\]]*\]/g, '').split(/[./]/).pop().trim().toLowerCase();
+}
+
+/**
+ * Returns the Edith FieldNames to drop if (and only if) every data failure
+ * (code 300) in the response is on an optional field. Otherwise [].
+ */
+function getDroppableFields(resp, isBike) {
+  if (!resp || resp.statusCode !== 300 || !Array.isArray(resp.errors)) return [];
+  const fatal = resp.errors.filter((e) => Number(e.StatusCode) >= 300);
+  if (fatal.length === 0) return [];
+  const isOptional = (name) => {
+    const k = fieldKey(name);
+    return OPTIONAL_EDITH_FIELDS.has(k) || (!isBike && OPTIONAL_BANK_FIELDS.has(k));
+  };
+  if (!fatal.every((e) => isOptional(e.FieldName))) return [];
+  return [...new Set(fatal.map((e) => e.FieldName))];
+}
+
+/** Removes the named elements from the request XML (bank fields remove the whole BankAccounts block). */
+function stripFields(xml, fieldNames) {
+  let out = xml;
+  for (const name of fieldNames) {
+    const k = fieldKey(name);
+    if (OPTIONAL_BANK_FIELDS.has(k)) {
+      out = out.replace(/<tem:BankAccounts>[\s\S]*?<\/tem:BankAccounts>/g, '');
+      continue;
+    }
+    const tag = k.replace(/[^a-z0-9]/g, '');
+    out = out.replace(new RegExp(`<tem:${tag}>[\\s\\S]*?</tem:${tag}>`, 'gi'), '');
+  }
+  return out;
 }
 
 // ── Record failure in D1 ──────────────────────────────────────
@@ -505,12 +672,15 @@ function buildEdithXML(data, companyCode, companyPass, dealer, salesRef) {
   const d = data;
   const isBike = dealer.financeType === 'bike';
 
-  const bankAccountsXml = (isBike && d.bankBranchCode) ? `
+  // Bank account is sent whenever a branch code is supplied (bike flow AND the
+  // standalone vehicle application). Edith AccountType: CHEQUE / SAVINGS /
+  // TRANSMISSION (CREDIT CARD needs CreditCardType and no branch code — not supported here).
+  const bankAccountsXml = d.bankBranchCode ? `
         <tem:BankAccounts>
           <tem:BankAccount>
             ${d.bankAccountNumber ? `<tem:AccountNumber>${esc(d.bankAccountNumber)}</tem:AccountNumber>` : ''}
             ${d.accountType      ? `<tem:AccountType>${esc(d.accountType.toUpperCase())}</tem:AccountType>` : ''}
-            <tem:AccountHolderName>${esc((d.firstName || "") + " " + (d.lastName || ""))}</tem:AccountHolderName>
+            <tem:AccountHolderName>${esc((d.accountHolderName || ((d.firstName || "") + " " + (d.lastName || ""))).trim().slice(0, 100))}</tem:AccountHolderName>
             <tem:BankBranchCode>${esc(d.bankBranchCode)}</tem:BankBranchCode>
             <tem:PrimaryAccountInd>-1</tem:PrimaryAccountInd>
           </tem:BankAccount>
@@ -533,6 +703,12 @@ function buildEdithXML(data, companyCode, companyPass, dealer, salesRef) {
   // doesn't get silently ignored/errored by Edith's validation.
   const workTelCodeDigits = d.workTelephoneCode ? stripNonDigits(d.workTelephoneCode) : '';
   const workTelNumberDigits = d.workTelephoneNumber ? stripNonDigits(d.workTelephoneNumber) : '';
+
+  // Edith nulls BondRentPayments / MunicipalPayments when ResidentialStatus is OWNER BOND FREE.
+  const isOwnerFree = String(d.residentialStatus || '').toUpperCase() === 'OWNER BOND FREE';
+  // LoanRepayments: applicant-entered value (standalone app) wins; otherwise the
+  // Seriti bureau figure (widget flow). Never both — that would double count.
+  const loanRepayments = Number(d.loanRepayments) > 0 ? d.loanRepayments : d.bureauExpenses;
 
   return `<?xml version="1.0" encoding="utf-8"?>
 <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tem="http://ws.edith.co.za/EdithServices/PolicyServicesV300">
@@ -574,6 +750,7 @@ function buildEdithXML(data, companyCode, companyPass, dealer, salesRef) {
           ${d.nextOfKinFirstName ? `<tem:FirstName>${esc(d.nextOfKinFirstName)}</tem:FirstName>` : ''}
           ${d.nextOfKinLastName  ? `<tem:LastName>${esc(d.nextOfKinLastName)}</tem:LastName>` : ''}
           ${d.nextOfKinMobile    ? `<tem:MobileNumber>${esc(normaliseMobile(d.nextOfKinMobile))}</tem:MobileNumber>` : ''}
+          ${d.nextOfKinEmail     ? `<tem:EmailAddress>${esc(String(d.nextOfKinEmail).slice(0, 100))}</tem:EmailAddress>` : ''}
         </tem:Relative>` : ''}
        <tem:Client>
           ${d.title         ? `<tem:Title>${esc(d.title.toUpperCase())}</tem:Title>` : ''}
@@ -583,6 +760,7 @@ function buildEdithXML(data, companyCode, companyPass, dealer, salesRef) {
           ${d.emailAddress  ? `<tem:EmailAddress>${esc(d.emailAddress)}</tem:EmailAddress>` : ''}
           ${d.idNumber      ? `<tem:IDType>${esc(d.idType || 'RSA ID')}</tem:IDType><tem:IDNumber>${d.idNumber}</tem:IDNumber>` : '<tem:IDType>FOREIGN NATIONAL</tem:IDType>'}
           ${d.gender        ? `<tem:Gender>${esc(d.gender.toUpperCase())}</tem:Gender>` : ''}
+          ${d.ethnicGroup ? `<tem:EthnicGroup>${esc(String(d.ethnicGroup).toUpperCase())}</tem:EthnicGroup>` : ''}
           ${d.educationLevel ? `<tem:EducationLevel>${esc(d.educationLevel)}</tem:EducationLevel>` : ''}
           ${d.maritalStatus ? `<tem:MaritalStatus>${esc(d.maritalStatus)}</tem:MaritalStatus>` : ''}
           ${d.marriageType  ? `<tem:MarriageType>${esc(d.marriageType)}</tem:MarriageType>` : ''}
@@ -608,8 +786,25 @@ function buildEdithXML(data, companyCode, companyPass, dealer, salesRef) {
           ${d.salaryDay && Number(d.salaryDay) >= 1 && Number(d.salaryDay) <= 31 ? `<tem:SalaryDay>${Number(d.salaryDay)}</tem:SalaryDay>` : ''}
           ${d.basicSalary    ? `<tem:BasicSalary>${Number(d.basicSalary).toFixed(2)}</tem:BasicSalary>` : ''}
           ${d.nettSalary     ? `<tem:NettSalary>${Number(d.nettSalary).toFixed(2)}</tem:NettSalary>` : ''}
-          ${d.bureauExpenses ? `<tem:LoanRepayments>${Number(d.bureauExpenses).toFixed(2)}</tem:LoanRepayments>` : ''}
+          ${moneyTag('LoanRepayments', loanRepayments)}
+          ${moneyTag('VehicleRepayments', d.vehicleRepayments)}
+          ${moneyTag('InsurancePayments', d.insurancePayments)}
+          ${isOwnerFree ? '' : moneyTag('MunicipalPayments', d.municipalPayments)}
+          ${isOwnerFree ? '' : moneyTag('BondRentPayments', d.monthlyRentExpense)}
+          ${moneyTag('CreditCardPayments', d.creditCardPayments)}
+          ${moneyTag('FurnitureAccountPayments', d.furnitureAccountPayments)}
+          ${moneyTag('ClothingAccountPayments', d.clothingAccountPayments)}
+          ${moneyTag('OverdraftPayments', d.overdraftPayments)}
+          ${moneyTag('TelephonePayments', d.telephonePayments)}
+          ${moneyTag('TransportCosts', d.transportCosts)}
+          ${moneyTag('FoodEntertainmentCosts', d.monthlyFoodExpense)}
+          ${moneyTag('EducationCosts', d.educationCosts)}
+          ${moneyTag('ChildMaintenance', d.childMaintenance)}
+          ${moneyTag('HouseHoldExpenses', d.householdExpenses)}
+          ${moneyTag('OtherPayments', d.monthlyOtherExpense)}
           <tem:FundsSource>SALARY</tem:FundsSource>
+          ${moneyTag('SecurityPayments', d.securityPayments)}
+          ${d.otherPaymentsDescription ? `<tem:OtherPaymentsDescription>${esc(String(d.otherPaymentsDescription).slice(0, 100))}</tem:OtherPaymentsDescription>` : ''}
           <tem:FinanceApplication>
             <tem:CompanyCode>${companyCode}</tem:CompanyCode>
             ${d.depositAmount ? `<tem:DepositValue>${Number(d.depositAmount).toFixed(2)}</tem:DepositValue>` : ''}
@@ -632,6 +827,12 @@ function buildEdithXML(data, companyCode, companyPass, dealer, salesRef) {
 }
 
 // ── Helpers ───────────────────────────────────────────────────
+
+/** Money (2dp) element — omitted when blank, zero or not a positive number. */
+function moneyTag(tag, value) {
+  const n = Number(value);
+  return n > 0 ? `<tem:${tag}>${n.toFixed(2)}</tem:${tag}>` : '';
+}
 
 function esc(str) {
   return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
