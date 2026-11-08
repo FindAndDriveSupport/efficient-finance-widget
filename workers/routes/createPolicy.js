@@ -22,6 +22,7 @@
 
 import { SYSTEM_MESSAGES, parseEdithErrors } from '../utils/edithErrors.js';
 import { completeApplicant } from './completeApplicant.js';
+import { recordProgressEvent } from './progress.js';
 
 // YONDA Service Fee — defaults applied for financeType === 'bike'
 const YONDA_SERVICE_FEE = {
@@ -55,6 +56,24 @@ export async function handleCreatePolicy(request, ctx, jsonResponse) {
   }
 
   const salesRef = generateSalesRef(dealerConfig.branchCode);
+
+  // Step-by-step progress tracking (no-op unless the frontend sent a sessionId).
+  // Never blocks or alters the response.
+  const track = (event, extra = {}) => {
+    if (!body.sessionId) return;
+    workerCtx?.waitUntil(recordProgressEvent(env, {
+      sessionId: body.sessionId,
+      dealerKey: dealerConfig.key,
+      step: event === 'failed' ? 'documents' : 'submitted',
+      event,
+      idNumber: body.idNumber,
+      name: [body.firstName, body.lastName].filter(Boolean).join(' '),
+      mobile: body.mobileNumber,
+      vehicle: [body.vehicleMake, body.vehicleModel].filter(Boolean).join(' '),
+      salesRef,
+      ...extra,
+    }));
+  };
   const xml = buildEdithXML(body, companyCode, companyPass, dealerConfig, salesRef);
 
   console.log(JSON.stringify({
@@ -125,6 +144,7 @@ export async function handleCreatePolicy(request, ctx, jsonResponse) {
   // ── All retries exhausted — genuine network failure ───────────
   if (networkFailure) {
     const failureReason = `Network failure after ${RETRY_LIMIT} attempts — Edith unreachable`;
+    track('manual_followup', { detail: failureReason });
     workerCtx?.waitUntil(
       recordFailure({
         env,
@@ -208,6 +228,7 @@ export async function handleCreatePolicy(request, ctx, jsonResponse) {
   // ── Edith system-level error (500) ────────────────────────────
   if (edithResponse.statusCode === 500) {
     const failureReason = `Edith system error 500 — ${edithResponse.systemMessage || 'System failure'}`;
+    track('manual_followup', { detail: failureReason });
     workerCtx?.waitUntil(
       recordFailure({
         env,
@@ -244,6 +265,7 @@ export async function handleCreatePolicy(request, ctx, jsonResponse) {
   if (SYSTEM_MESSAGES[sysCode]) {
     const msg = SYSTEM_MESSAGES[sysCode];
     logError('edith_system_error', { code: sysCode, internal: msg.internal }, env, { salesRef });
+    track('failed', { detail: `Edith system code ${sysCode}` });
     return jsonResponse({
       error: msg.title,
       message: msg.message,
@@ -260,6 +282,7 @@ export async function handleCreatePolicy(request, ctx, jsonResponse) {
 
     if (fatal.length > 0) {
       logError('edith_field_errors', fatal, env, { salesRef });
+      track('failed', { detail: edithResponse.errors.filter((e) => Number(e.StatusCode) >= 300).map((e) => e.FieldName).join(', ') });
       return jsonResponse({
         success: false,
         policyNumber: edithResponse.policyNumber || null,
@@ -271,6 +294,7 @@ export async function handleCreatePolicy(request, ctx, jsonResponse) {
 
     // Code 200 — success with warnings
     logWarning('edith_field_warnings', warnings, env, { salesRef });
+    track('submitted', { policyNumber: edithResponse.policyNumber });
     writePolicyEvent({
       env,
       workerCtx,
@@ -302,6 +326,7 @@ export async function handleCreatePolicy(request, ctx, jsonResponse) {
 
   // ── Clean success ─────────────────────────────────────────────
   const policyNumber = edithResponse.policyNumber;
+  track('submitted', { policyNumber });
   writePolicyEvent({
     env,
     workerCtx,
