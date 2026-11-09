@@ -443,6 +443,21 @@ function sanitizeOptionalFields(input, isBike = false) {
     if (Number.isFinite(n) && n >= 0 && n < 2_000_000) b.odometerReading = n; else delete b.odometerReading;
   }
 
+  // Languages must be one of Edith's values (CorrespondenceLanguage has no OTHER).
+  const LANGS = ['ENGLISH', 'AFRIKAANS', 'ISINDEBELE', 'ISIXHOSA', 'ISIZULU', 'SESOTHO SA LEBOWA', 'SESOTHO', 'SETSWANA', 'SISWATI', 'TSHIVENDA', 'XITSONGA'];
+  if (b.homeLanguage != null) {
+    const v = String(b.homeLanguage).trim().toUpperCase();
+    if (LANGS.includes(v) || v === 'OTHER') b.homeLanguage = v; else delete b.homeLanguage;
+  }
+  if (b.correspondenceLanguage != null) {
+    const v = String(b.correspondenceLanguage).trim().toUpperCase();
+    if (LANGS.includes(v)) b.correspondenceLanguage = v; else delete b.correspondenceLanguage;
+  }
+  if (b.workAddress1 != null) {
+    const v = String(b.workAddress1).trim().slice(0, 50);
+    if (v) b.workAddress1 = v; else delete b.workAddress1;
+  }
+
   if (b.taxNumber != null) {
     const t = String(b.taxNumber).replace(/\D/g, '');
     if (t.length >= 9 && t.length <= 20) b.taxNumber = t; else delete b.taxNumber;
@@ -489,7 +504,7 @@ function sanitizeOptionalFields(input, isBike = false) {
 
 // Edith element names (lower-case) that may be dropped if Edith rejects them.
 const OPTIONAL_EDITH_FIELDS = new Set([
-  'ethnicgroup', 'educationlevel', 'chassisvinnumber', 'stocknumber', 'colour', 'odometerreading', 'taxnumber', 'taxregisteredind', 'otherpaymentsdescription',
+  'homelanguage', 'correspondencelanguage', 'employmentaddress', 'ethnicgroup', 'educationlevel', 'chassisvinnumber', 'stocknumber', 'colour', 'odometerreading', 'taxnumber', 'taxregisteredind', 'otherpaymentsdescription',
   'loanrepayments', 'vehiclerepayments', 'insurancepayments', 'municipalpayments', 'bondrentpayments',
   'creditcardpayments', 'furnitureaccountpayments', 'clothingaccountpayments', 'overdraftpayments',
   'telephonepayments', 'transportcosts', 'foodentertainmentcosts', 'educationcosts', 'childmaintenance',
@@ -818,6 +833,8 @@ function buildEdithXML(data, companyCode, companyPass, dealer, salesRef) {
           ${d.ethnicGroup ? `<tem:EthnicGroup>${esc(String(d.ethnicGroup).toUpperCase())}</tem:EthnicGroup>` : ''}
           ${d.educationLevel ? `<tem:EducationLevel>${esc(d.educationLevel)}</tem:EducationLevel>` : ''}
           ${d.taxNumber ? `<tem:TaxRegisteredInd>-1</tem:TaxRegisteredInd><tem:TaxNumber>${esc(String(d.taxNumber).slice(0, 20))}</tem:TaxNumber>` : ''}
+          ${d.homeLanguage ? `<tem:HomeLanguage>${esc(d.homeLanguage)}</tem:HomeLanguage>` : ''}
+          ${d.correspondenceLanguage ? `<tem:CorrespondenceLanguage>${esc(d.correspondenceLanguage)}</tem:CorrespondenceLanguage>` : ''}
           ${d.maritalStatus ? `<tem:MaritalStatus>${esc(d.maritalStatus)}</tem:MaritalStatus>` : ''}
           ${d.marriageType  ? `<tem:MarriageType>${esc(d.marriageType)}</tem:MarriageType>` : ''}
           ${d.marriageDate  ? `<tem:MarriageDate>${esc(d.marriageDate)}</tem:MarriageDate>` : ''}
@@ -839,6 +856,14 @@ function buildEdithXML(data, companyCode, companyPass, dealer, salesRef) {
           ${workTelCodeDigits   ? `<tem:WorkTelephoneCode>${esc(workTelCodeDigits)}</tem:WorkTelephoneCode>` : ''}
           ${workTelNumberDigits ? `<tem:WorkTelephoneNumber>${esc(workTelNumberDigits)}</tem:WorkTelephoneNumber>` : ''}
           ${d.currentEmploymentStartDate ? `<tem:CurrentEmploymentStartDate>${esc(d.currentEmploymentStartDate)}</tem:CurrentEmploymentStartDate>` : ''}
+          ${d.workAddress1 ? `
+          <tem:EmploymentAddress>
+            <tem:Address1>${esc(d.workAddress1)}</tem:Address1>
+            ${d.workSuburb   ? `<tem:Suburb>${esc(d.workSuburb)}</tem:Suburb>` : ''}
+            ${d.workCity     ? `<tem:City>${esc(d.workCity)}</tem:City>` : ''}
+            ${d.workPostCode ? `<tem:PostCode>${esc(d.workPostCode)}</tem:PostCode>` : ''}
+            <tem:Country>SOUTH AFRICA</tem:Country>
+          </tem:EmploymentAddress>` : ''}
           ${d.salaryDay && Number(d.salaryDay) >= 1 && Number(d.salaryDay) <= 31 ? `<tem:SalaryDay>${Number(d.salaryDay)}</tem:SalaryDay>` : ''}
           ${d.basicSalary    ? `<tem:BasicSalary>${Number(d.basicSalary).toFixed(2)}</tem:BasicSalary>` : ''}
           ${d.nettSalary     ? `<tem:NettSalary>${Number(d.nettSalary).toFixed(2)}</tem:NettSalary>` : ''}
