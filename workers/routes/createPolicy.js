@@ -23,6 +23,7 @@
 import { SYSTEM_MESSAGES, parseEdithErrors } from '../utils/edithErrors.js';
 import { completeApplicant } from './completeApplicant.js';
 import { recordProgressEvent } from './progress.js';
+import { recordSubmissionReview } from './documentIntegrity.js';
 
 // YONDA Service Fee — defaults applied for financeType === 'bike'
 const YONDA_SERVICE_FEE = {
@@ -295,6 +296,7 @@ export async function handleCreatePolicy(request, ctx, jsonResponse) {
     // Code 200 — success with warnings
     logWarning('edith_field_warnings', warnings, env, { salesRef });
     track('submitted', { policyNumber: edithResponse.policyNumber });
+    workerCtx?.waitUntil(recordSubmissionReview(env, body.sessionId, salesRef, body.idNumber));
     writePolicyEvent({
       env,
       workerCtx,
@@ -327,6 +329,7 @@ export async function handleCreatePolicy(request, ctx, jsonResponse) {
   // ── Clean success ─────────────────────────────────────────────
   const policyNumber = edithResponse.policyNumber;
   track('submitted', { policyNumber });
+  workerCtx?.waitUntil(recordSubmissionReview(env, body.sessionId, salesRef, body.idNumber));
   writePolicyEvent({
     env,
     workerCtx,
@@ -422,6 +425,29 @@ function sanitizeOptionalFields(input, isBike = false) {
     if (ETHNIC_GROUPS.has(v)) b.ethnicGroup = v; else delete b.ethnicGroup;
   }
 
+  // Stock-unit vehicle fields: each is optional and dropped if it would not pass Edith's rules.
+  if (b.chassisVinNumber != null) {
+    const v = String(b.chassisVinNumber).replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+    if (v.length === 15 || v.length === 17) b.chassisVinNumber = v; else delete b.chassisVinNumber;
+  }
+  if (b.stockNumber != null) {
+    const v = String(b.stockNumber).trim().slice(0, 20);
+    if (v) b.stockNumber = v; else delete b.stockNumber;
+  }
+  if (b.vehicleColour != null) {
+    const v = String(b.vehicleColour).trim().slice(0, 20);
+    if (v) b.vehicleColour = v; else delete b.vehicleColour;
+  }
+  if (b.odometerReading != null) {
+    const n = Math.round(Number(b.odometerReading));
+    if (Number.isFinite(n) && n >= 0 && n < 2_000_000) b.odometerReading = n; else delete b.odometerReading;
+  }
+
+  if (b.taxNumber != null) {
+    const t = String(b.taxNumber).replace(/\D/g, '');
+    if (t.length >= 9 && t.length <= 20) b.taxNumber = t; else delete b.taxNumber;
+  }
+
   for (const k of OPTIONAL_MONEY_FIELDS) {
     if (b[k] == null || b[k] === '') { delete b[k]; continue; }
     const n = Number(b[k]);
@@ -463,7 +489,7 @@ function sanitizeOptionalFields(input, isBike = false) {
 
 // Edith element names (lower-case) that may be dropped if Edith rejects them.
 const OPTIONAL_EDITH_FIELDS = new Set([
-  'ethnicgroup', 'educationlevel', 'otherpaymentsdescription',
+  'ethnicgroup', 'educationlevel', 'chassisvinnumber', 'stocknumber', 'colour', 'odometerreading', 'taxnumber', 'taxregisteredind', 'otherpaymentsdescription',
   'loanrepayments', 'vehiclerepayments', 'insurancepayments', 'municipalpayments', 'bondrentpayments',
   'creditcardpayments', 'furnitureaccountpayments', 'clothingaccountpayments', 'overdraftpayments',
   'telephonepayments', 'transportcosts', 'foodentertainmentcosts', 'educationcosts', 'childmaintenance',
@@ -754,6 +780,10 @@ function buildEdithXML(data, companyCode, companyPass, dealer, salesRef) {
         ${d.vehicleMm      ? `<tem:VehicleCode>${esc(d.vehicleMm)}</tem:VehicleCode>` : ''}
         ${(d.vehicleMake || d.vehicleModel) ? `<tem:VehicleDescription>${esc([d.vehicleMake, d.vehicleModel].filter(Boolean).join(' '))}</tem:VehicleDescription>` : ''}
         <tem:NewUsed>${d.vehicleCondition ? esc(d.vehicleCondition.toUpperCase()) : 'USED'}</tem:NewUsed>
+        ${d.stockNumber ? `<tem:StockNumber>${esc(d.stockNumber)}</tem:StockNumber>` : ''}
+        ${d.vehicleColour ? `<tem:Colour>${esc(d.vehicleColour)}</tem:Colour>` : ''}
+        ${d.odometerReading != null ? `<tem:OdometerReading>${d.odometerReading}</tem:OdometerReading>` : ''}
+        ${d.chassisVinNumber ? `<tem:ChassisVINNumber>${esc(d.chassisVinNumber)}</tem:ChassisVINNumber>` : ''}
         ${/* Confirmed against Edith Policy Webservices v312.19: RetailPrice
              is a Policy-level field ("the listed price of the vehicle"),
              sibling to Manufacturer/Model/NewUsed — not nested under Client
@@ -787,6 +817,7 @@ function buildEdithXML(data, companyCode, companyPass, dealer, salesRef) {
           ${d.gender        ? `<tem:Gender>${esc(d.gender.toUpperCase())}</tem:Gender>` : ''}
           ${d.ethnicGroup ? `<tem:EthnicGroup>${esc(String(d.ethnicGroup).toUpperCase())}</tem:EthnicGroup>` : ''}
           ${d.educationLevel ? `<tem:EducationLevel>${esc(d.educationLevel)}</tem:EducationLevel>` : ''}
+          ${d.taxNumber ? `<tem:TaxRegisteredInd>-1</tem:TaxRegisteredInd><tem:TaxNumber>${esc(String(d.taxNumber).slice(0, 20))}</tem:TaxNumber>` : ''}
           ${d.maritalStatus ? `<tem:MaritalStatus>${esc(d.maritalStatus)}</tem:MaritalStatus>` : ''}
           ${d.marriageType  ? `<tem:MarriageType>${esc(d.marriageType)}</tem:MarriageType>` : ''}
           ${d.marriageDate  ? `<tem:MarriageDate>${esc(d.marriageDate)}</tem:MarriageDate>` : ''}
