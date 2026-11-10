@@ -360,7 +360,7 @@ async function callClaude(env, spec, files) {
     type: f.mediaType === 'application/pdf' ? 'document' : 'image',
     source: { type: 'base64', media_type: f.mediaType, data: f.data },
   }));
-  content.push({ type: 'text', text: spec.prompt });
+  content.push({ type: 'text', text: spec.prompt + '\n\nRespond only by calling the record_fields tool exactly once.' });
 
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), REQUEST_TIMEOUT_MS);
@@ -374,7 +374,7 @@ async function callClaude(env, spec, files) {
         max_tokens: spec.maxTokens || MAX_TOKENS,
         system: SYSTEM_PROMPT,
         tools: [{ name: 'record_fields', description: 'Record the fields read from the documents.', input_schema: spec.schema }],
-        tool_choice: { type: 'tool', name: 'record_fields' },
+        tool_choice: { type: 'auto' },
         messages: [{ role: 'user', content }],
       }),
     });
