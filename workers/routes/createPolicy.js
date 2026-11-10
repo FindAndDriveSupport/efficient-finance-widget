@@ -443,6 +443,14 @@ function sanitizeOptionalFields(input, isBike = false) {
     if (Number.isFinite(n) && n >= 0 && n < 2_000_000) b.odometerReading = n; else delete b.odometerReading;
   }
 
+  // Countries: Edith's appendix names (upper case). Edith validates the exact value; an unknown one is dropped on retry.
+  for (const k of ['birthCountry', 'residenceCountry']) {
+    if (b[k] != null) {
+      const v = String(b[k]).trim().toUpperCase();
+      if (/^[A-Z][A-Z ()'.,-]{2,50}$/.test(v)) b[k] = v; else delete b[k];
+    }
+  }
+
   // Languages must be one of Edith's values (CorrespondenceLanguage has no OTHER).
   const LANGS = ['ENGLISH', 'AFRIKAANS', 'ISINDEBELE', 'ISIXHOSA', 'ISIZULU', 'SESOTHO SA LEBOWA', 'SESOTHO', 'SETSWANA', 'SISWATI', 'TSHIVENDA', 'XITSONGA'];
   if (b.homeLanguage != null) {
@@ -504,7 +512,7 @@ function sanitizeOptionalFields(input, isBike = false) {
 
 // Edith element names (lower-case) that may be dropped if Edith rejects them.
 const OPTIONAL_EDITH_FIELDS = new Set([
-  'homelanguage', 'correspondencelanguage', 'employmentaddress', 'ethnicgroup', 'educationlevel', 'chassisvinnumber', 'stocknumber', 'colour', 'odometerreading', 'taxnumber', 'taxregisteredind', 'otherpaymentsdescription',
+  'birthcountry', 'residencecountry', 'homelanguage', 'correspondencelanguage', 'employmentaddress', 'ethnicgroup', 'educationlevel', 'chassisvinnumber', 'stocknumber', 'colour', 'odometerreading', 'taxnumber', 'taxregisteredind', 'otherpaymentsdescription',
   'loanrepayments', 'vehiclerepayments', 'insurancepayments', 'municipalpayments', 'bondrentpayments',
   'creditcardpayments', 'furnitureaccountpayments', 'clothingaccountpayments', 'overdraftpayments',
   'telephonepayments', 'transportcosts', 'foodentertainmentcosts', 'educationcosts', 'childmaintenance',
@@ -830,14 +838,16 @@ function buildEdithXML(data, companyCode, companyPass, dealer, salesRef) {
           ${d.emailAddress  ? `<tem:EmailAddress>${esc(d.emailAddress)}</tem:EmailAddress>` : ''}
           ${d.idNumber      ? `<tem:IDType>${esc(d.idType || 'RSA ID')}</tem:IDType><tem:IDNumber>${d.idNumber}</tem:IDNumber>` : '<tem:IDType>FOREIGN NATIONAL</tem:IDType>'}
           ${d.gender        ? `<tem:Gender>${esc(d.gender.toUpperCase())}</tem:Gender>` : ''}
+          ${d.birthCountry ? `<tem:BirthCountry>${esc(d.birthCountry)}</tem:BirthCountry>` : ''}
           ${d.ethnicGroup ? `<tem:EthnicGroup>${esc(String(d.ethnicGroup).toUpperCase())}</tem:EthnicGroup>` : ''}
           ${d.educationLevel ? `<tem:EducationLevel>${esc(d.educationLevel)}</tem:EducationLevel>` : ''}
           ${d.taxNumber ? `<tem:TaxRegisteredInd>-1</tem:TaxRegisteredInd><tem:TaxNumber>${esc(String(d.taxNumber).slice(0, 20))}</tem:TaxNumber>` : ''}
-          ${d.homeLanguage ? `<tem:HomeLanguage>${esc(d.homeLanguage)}</tem:HomeLanguage>` : ''}
-          ${d.correspondenceLanguage ? `<tem:CorrespondenceLanguage>${esc(d.correspondenceLanguage)}</tem:CorrespondenceLanguage>` : ''}
+          ${d.residenceCountry ? `<tem:ResidenceCountry>${esc(d.residenceCountry)}</tem:ResidenceCountry>` : ''}
           ${d.maritalStatus ? `<tem:MaritalStatus>${esc(d.maritalStatus)}</tem:MaritalStatus>` : ''}
           ${d.marriageType  ? `<tem:MarriageType>${esc(d.marriageType)}</tem:MarriageType>` : ''}
           ${d.marriageDate  ? `<tem:MarriageDate>${esc(d.marriageDate)}</tem:MarriageDate>` : ''}
+          ${d.homeLanguage ? `<tem:HomeLanguage>${esc(d.homeLanguage)}</tem:HomeLanguage>` : ''}
+          ${d.correspondenceLanguage ? `<tem:CorrespondenceLanguage>${esc(d.correspondenceLanguage)}</tem:CorrespondenceLanguage>` : ''}
           ${d.address1 ? `
           <tem:PhysicalAddress>
             <tem:Address1>${esc(d.address1)}</tem:Address1>
