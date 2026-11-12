@@ -28,7 +28,7 @@ const DEFAULT_MODEL = 'claude-sonnet-5-5';
 const MAX_FILES = 8;
 const MAX_TOTAL_B64_CHARS = 24 * 1024 * 1024; // ~18 MB of binary
 const MAX_TOKENS = 3000;
-const REQUEST_TIMEOUT_MS = 100_000;
+const REQUEST_TIMEOUT_MS = 170_000;
 const ALLOWED_MEDIA = new Set(['image/jpeg', 'image/png', 'image/webp', 'application/pdf']);
 const LIMIT_PER_SESSION_PER_HOUR = 15;
 const LIMIT_PER_IP_PER_HOUR = 40;
@@ -77,6 +77,32 @@ const EXPENSE_CATEGORIES = {
   ignore: null, // transfers between own accounts, cash withdrawals, savings/investments, ATM, reversals
 };
 
+
+/**
+ * Deterministic classification of common South African bank-statement descriptions.
+ * Applied AFTER the model, so well-known merchants are categorised identically every time.
+ * Returns an EXPENSE_CATEGORIES key, or null to keep the model's choice.
+ */
+const RULES = [
+  [/place to stay|\brent\b|rental|landlord|accommodation|\blodge\b|letting|property management/i, 'rent_or_bond'],
+  [/electricity|eskom|city power|municipal|water & |rates and|\brates\b/i, 'municipal_rates_water_electricity'],
+  [/betway|hollywoodbets|sportingbet|supabets|lottostar|sunbet|betting|lotto\b|\bott\b|cash sent|send cash|investment|savings|\bcash deposit\b|\batm\b|cash withdrawal|cash advanc|cashback|card pos cash|credit int|interest|service fee|monthly fee|bank charge|reversal|refund/i, 'ignore'],
+  [/prepaid airtime|airtime|prepaid data|vodacom|\bmtn\b|telkom|\brain\b|afrihost|webafrica|fibre|vumatel|openserve/i, 'telephone_cellphone_internet'],
+  [/gautrain|\buber\b|\bbolt\b|indriver|taxi|e-?toll|sanral|prasa|metrorail|rea vaya|myciti|fuel purchase|\bengen\b|\bbp\b|\bsasol\b|astron|\bshell\b|total ?energies|caltex|\bsasol\b/i, 'transport_fuel_taxi'],
+  [/checkers|shoprite|\bpnp\b|pick n pay|\bspar\b|woolworths|food lover|\bflm\b|superspar|familymart|cc fresh|butcher|boxer|usave|makro|\bokay\b|cambridge/i, 'groceries_food'],
+  [/dstv|multichoice|showmax|netflix|spotify|youtube premium|apple\.com\/bill|google (one|storage)/i, 'other_recurring'],
+  [/discovery|sanlam|old mutual|momentum|liberty|outsurance|hollard|king price|miway|santam|clientele|assupol|funeral|premium/i, 'insurance_premium'],
+  [/school|creche|crèche|tuition|university|college|unisa/i, 'education_school_fees'],
+  [/adt\b|fidelity|chubb|armed response|\bcsi\b/i, 'security_armed_response'],
+  [/mcd|mcdonald|\bbk\b|burger king|kfc|nando|romans pizza|steers|wimpy|debonairs|kauai|restobar|\bkota\b|food ?c|liquor|loco liq|sams liq|\btops\b|clicks|dis-?chem|pharmacy|florist|pawtique|\bpet\b|takealot|amazon|temu|shein|mr ?price|\bpep\b|bakery|caf[eé]\b|coffee/i, 'household_other'],
+];
+
+export function classifyByRule(description) {
+  const d = String(description || '');
+  for (const [re, cat] of RULES) if (re.test(d)) return cat;
+  return null;
+}
+
 const CATEGORIES = {
   id: {
     prompt: 'These are an ID document or passport (front/back or several pages). Record one entry per distinct identity document. ' +
@@ -113,16 +139,22 @@ const CATEGORIES = {
   },
   bank_transactions: {
     perFile: true,
-    maxTokens: 12000,
-    prompt: 'Read this bank statement. List EVERY money-OUT (debit) transaction, one entry each, in statement order. ' +
-      'date is YYYY-MM-DD. amount is the positive debit amount. description is the transaction description shortened to at most 40 characters. ' +
-      'category must be exactly one of the allowed values. Use "ignore" for transfers to or from the account holder\'s own accounts, cash withdrawals, ATM withdrawals, ' +
-      'savings or investment transfers, reversals, and payments to individuals you cannot classify. Use other_recurring only for clearly recurring debit orders or subscriptions that fit no other category. ' +
+    maxTokens: 16000,
+    prompt: 'Read this bank statement. List every money-OUT (debit) transaction that is a living expense, one entry each, in statement order. ' +
+      'date is YYYY-MM-DD. amount is the positive debit amount. description is the transaction description (merchant/payee only, no card numbers) in at most 30 characters. ' +
+      'category must be exactly one of the allowed values. ' +
+      'DO NOT list: transfers to or from the account holder\'s own accounts (a payee that matches the account holder\'s own name or first name, "investment", "savings", "loan <own name>", own TymeBank/other-bank accounts), ' +
+      'cash withdrawals, "cash sent", ATM, cash deposits, betting and gambling (Betway, Hollywoodbets, lottery, OTT vouchers), cashback, bank fees and charges (including lines with no description), interest, reversals and refunds. ' +
+      'Payments to other individuals (PayShap, Send Money, eWallet) are not expenses unless the reference clearly says what they are for (for example "rent", "food", "transport", "school"); otherwise leave them out. ' +
+      'If the statement shows debit orders or DebiCheck mandates that FAILED (for example "DebiCheck Insufficient Funds (R302.95): <creditor>" or "unpaid"), list each in failedDebitOrders with the creditor name and the amount; do not put them in transactions. ' +
+      'Guidance: airtime, data, cellphone, ISP and TV-streaming bundles are telephone_cellphone_internet; Uber, Bolt, Gautrain, taxi and fuel are transport_fuel_taxi; supermarkets, butcheries and grocery delivery are groceries_food; ' +
+      'restaurants, takeaways, liquor, pharmacy and other everyday purchases are household_other; monthly subscriptions and debit orders that fit nothing else are other_recurring. ' +
       'Also list in salaryCredits any money-IN deposits that look like salary or wages (employer name or "salary"/"payroll" in the description). Do not list other credits. If the statement has no readable transactions return an empty list.',
     schema: {
       type: 'object',
       properties: {
         periodStart: S, periodEnd: S,
+        failedDebitOrders: { type: 'array', items: { type: 'object', properties: { date: S, creditor: S, amount: N }, required: ['creditor'] } },
         salaryCredits: { type: 'array', items: { type: 'object', properties: { date: S, amount: N, description: S }, required: ['date', 'amount'] } },
         transactions: {
           type: 'array',
@@ -324,31 +356,49 @@ function normaliseProof(raw) {
 export function combineTransactions(raws) {
   const seen = new Set(); // keys from EARLIER statements (overlap); identical rows within one statement are kept
   const txs = [];
+  let truncated = false;
+  const failed = new Map();
   for (const raw of raws) {
+    if (raw && raw._truncated) truncated = true;
+    for (const d of list(raw, 'failedDebitOrders')) {
+      const k = `${String(d.creditor || '').trim().toLowerCase()}|${money(d.amount) || ''}`;
+      if (d.creditor && !failed.has(k)) failed.set(k, { creditor: String(d.creditor).trim().slice(0, 40), amount: money(d.amount), n: 0 });
+      if (failed.has(k)) failed.get(k).n++;
+    }
     const local = new Set();
     for (const t of list(raw, 'transactions')) {
       const date = isoDate(t.date), amount = money(t.amount);
-      if (!date || !amount || !(t.category in EXPENSE_CATEGORIES)) continue;
+      if (!date || !amount) continue;
+      const category = classifyByRule(t.description) || t.category;
+      if (!(category in EXPENSE_CATEGORIES)) continue;
       const key = `${date}|${amount}|${String(t.description || '').toLowerCase().slice(0, 25)}`;
       if (seen.has(key)) continue; // already counted from an overlapping statement
       local.add(key);
-      txs.push({ month: date.slice(0, 7), amount, field: EXPENSE_CATEGORIES[t.category] });
+      txs.push({ ms: Date.parse(date), amount, field: EXPENSE_CATEGORIES[category] });
     }
     for (const k of local) seen.add(k);
   }
   const fields = {}, warnings = [];
   if (!txs.length) return { fields, warnings: ['No transactions could be read from the bank statements.'] };
 
-  // Use the most recent 3 calendar months.
-  const months = [...new Set(txs.map((t) => t.month))].sort().slice(-3);
-  const used = txs.filter((t) => months.includes(t.month));
+  // Use the latest 3 months (91 days) ending at the last transaction. Statements usually run mid-month to
+  // mid-month, so calendar months would split one statement across four buckets and distort the average.
+  const DAY = 86_400_000;
+  const end = Math.max(...txs.map((t) => t.ms)), start = Math.min(...txs.map((t) => t.ms));
+  const spanDays = Math.min(91, Math.floor((end - start) / DAY) + 1);
+  const used = txs.filter((t) => t.ms > end - 91 * DAY);
+  const months = Math.max(1, spanDays / 30.4);
   const totals = {};
   for (const t of used) if (t.field) totals[t.field] = (totals[t.field] || 0) + t.amount;
   for (const [field, total] of Object.entries(totals)) {
-    const avg = Math.round(total / months.length);
+    const avg = Math.round(total / months);
     if (avg > 0) fields[field] = avg;
   }
-  if (months.length < 3) warnings.push(`Only ${months.length} month${months.length === 1 ? '' : 's'} of transactions could be read, so expense estimates may be less accurate.`);
+  if (spanDays < 85) warnings.push(`Only about ${Math.max(1, Math.round(spanDays / 30.4))} month of transactions could be read, so expense estimates may be less accurate.`);
+  if (truncated) warnings.push('Part of a very long bank statement could not be read, so some expenses may be missing — please check each amount.');
+  for (const d of [...failed.values()].slice(0, 3)) {
+    warnings.push(`Your statement shows ${d.n > 1 ? d.n + ' failed' : 'a failed'} debit order${d.n > 1 ? 's' : ''} to ${d.creditor}${d.amount ? ' (R' + d.amount + ')' : ''}. If this is a repayment you owe, please include it in your expenses.`);
+  }
   warnings.push('Expenses are estimated from your bank statement transactions — please check each amount.');
   return { fields, warnings };
 }
@@ -385,6 +435,7 @@ async function callClaude(env, spec, files) {
     const data = await res.json();
     const block = (data.content || []).find((b) => b.type === 'tool_use');
     if (!block?.input) throw new Error('Model returned no structured result');
+    if (data.stop_reason === 'max_tokens') block.input._truncated = true;
     return block.input;
   } finally {
     clearTimeout(timer);
