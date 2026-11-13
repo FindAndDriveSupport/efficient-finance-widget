@@ -30,7 +30,7 @@ const MAX_TOTAL_B64_CHARS = 24 * 1024 * 1024; // ~18 MB of binary
 const MAX_TOKENS = 3000;
 const REQUEST_TIMEOUT_MS = 170_000;
 const ALLOWED_MEDIA = new Set(['image/jpeg', 'image/png', 'image/webp', 'application/pdf']);
-const LIMIT_PER_SESSION_PER_HOUR = 15;
+const LIMIT_PER_SESSION_PER_HOUR = 30; // spouse applications read up to 8 document groups
 const LIMIT_PER_IP_PER_HOUR = 40;
 
 const SYSTEM_PROMPT =
@@ -538,7 +538,9 @@ export async function handleExtractDocuments(request, ctx, jsonResponse) {
     }
     // Authenticity checks run server-side and are never returned to the applicant. A failure here must not break extraction.
     try {
-      await saveCheck(env, sessionId, body.category, await buildIntegrity(env, body.category, raws, checked.files, fields, body.declaredId));
+      // Spouse documents are stored under their own category names so they are never compared with the applicant's.
+      const checkCategory = body.party === 'spouse' ? `spouse_${body.category}` : body.category;
+      await saveCheck(env, sessionId, checkCategory, await buildIntegrity(env, body.category, raws, checked.files, fields, body.declaredId));
     } catch (err) {
       console.error(JSON.stringify({ level: 'error', type: 'document_integrity_failed', error: String(err.message).slice(0, 200) }));
     }
