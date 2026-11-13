@@ -243,28 +243,37 @@ export async function reviewSession(env, sessionId) {
   const findings = [];
   for (const [category, r] of Object.entries(latest)) for (const f of r.findings) findings.push({ ...f, category });
 
-  const id = latest.id?.facts, lic = latest.drivers_licence?.facts, slip = latest.payslip?.facts, bank = latest.bank_statement?.facts, tx = latest.bank_transactions?.facts;
   const add = (code, severity, detail, category) => findings.push({ code, severity, detail, category: category || 'cross' });
 
-  if (id?.idHash && lic?.idHash && id.idHash !== lic.idHash) add('id_differs_from_licence', 'high', "ID number on the driver's licence differs from the ID document");
+  // The same checks run for the applicant's documents and, separately, the spouse's (categories prefixed "spouse_").
+  for (const prefix of ['', 'spouse_']) {
+    const who = prefix ? "spouse's " : '';
+    const id = latest[`${prefix}id`]?.facts, lic = latest[`${prefix}drivers_licence`]?.facts, slip = latest[`${prefix}payslip`]?.facts, bank = latest[`${prefix}bank_statement`]?.facts, tx = latest[`${prefix}bank_transactions`]?.facts;
 
-  if (id?.surnameTokens?.length) {
-    for (const [label, f] of [['drivers_licence', lic], ['payslip', slip], ['bank_statement', bank]]) {
-      const theirs = f?.nameTokens || f?.surnameTokens;
-      if (theirs?.length && !theirs.some((t) => id.surnameTokens.includes(t))) add(`surname_differs_${label}`, 'medium', `Name on the ${label.replace('_', ' ')} does not match the ID document surname`);
+    if (id?.idHash && lic?.idHash && id.idHash !== lic.idHash) add(`${prefix}id_differs_from_licence`, 'high', `ID number on the ${who}driver's licence differs from the ${who}ID document`);
+
+    if (id?.surnameTokens?.length) {
+      for (const [label, f] of [['drivers_licence', lic], ['payslip', slip], ['bank_statement', bank]]) {
+        const theirs = f?.nameTokens || f?.surnameTokens;
+        if (theirs?.length && !theirs.some((t) => id.surnameTokens.includes(t))) add(`${prefix}surname_differs_${label}`, 'medium', `Name on the ${who}${label.replace('_', ' ')} does not match the ${who}ID document surname`);
+      }
+    }
+
+    if (slip?.net && tx?.read) {
+      const matched = (tx.salaryCredits || []).some((c) => Math.abs(c - slip.net) <= Math.max(50, slip.net * 0.03));
+      if (!matched) add(`${prefix}payslip_net_not_in_bank`, (tx.salaryCredits || []).length ? 'medium' : 'low', `No salary deposit on the ${who}bank statements matches the ${who}payslip net pay`);
     }
   }
 
-  if (slip?.net && tx?.read) {
-    const matched = (tx.salaryCredits || []).some((c) => Math.abs(c - slip.net) <= Math.max(50, slip.net * 0.03));
-    if (!matched) add('payslip_net_not_in_bank', (tx.salaryCredits || []).length ? 'medium' : 'low', 'No salary deposit on the bank statements matches the payslip net pay');
-  }
+  // The same person's ID uploaded for both applicant and spouse.
+  const mine = latest.id?.facts, theirs = latest.spouse_id?.facts;
+  if (mine?.idHash && theirs?.idHash && mine.idHash === theirs.idHash) add('spouse_id_same_as_applicant', 'high', "The spouse's ID document has the same ID number as the applicant's");
 
   return { risk: overallRisk(findings), findings, documents: Object.keys(latest) };
 }
 
 /** Called after a successful submission: records the review once so finance can list flagged applications. */
-export async function recordSubmissionReview(env, sessionId, salesRef, submittedId) {
+export async function recordSubmissionReview(env, sessionId, salesRef, submittedId, submittedSpouseId) {
   if (!env.DB || !/^[A-Za-z0-9-]{8,64}$/.test(String(sessionId || ''))) return null;
   try {
     const review = await reviewSession(env, sessionId);
@@ -280,8 +289,16 @@ export async function recordSubmissionReview(env, sessionId, salesRef, submitted
         const h = JSON.parse(r.facts).idHash;
         if (h && h !== submittedHash) review.findings.push({ code: 'submitted_id_differs_from_document', severity: 'high', detail: `The ID number submitted differs from the ID number on the ${r.category.replace('_', ' ')}`, category: r.category });
       }
-      review.risk = overallRisk(review.findings);
     }
+    // Spouse applications: the spouse ID that was submitted vs the one read from the spouse's ID document.
+    const spouseSub = String(submittedSpouseId ?? '').replace(/\D/g, '');
+    if (spouseSub.length === 13) {
+      const h = await hash(env, `id:${spouseSub}`);
+      const row = await env.DB.prepare(`SELECT facts FROM document_checks WHERE session_id = ? AND category = 'spouse_id' ORDER BY created_at DESC LIMIT 1`).bind(sessionId).first();
+      const docHash = row ? JSON.parse(row.facts).idHash : null;
+      if (docHash && docHash !== h) review.findings.push({ code: 'submitted_spouse_id_differs_from_document', severity: 'high', detail: "The spouse ID number submitted differs from the ID number on the spouse's ID document", category: 'spouse_id' });
+    }
+    review.risk = overallRisk(review.findings);
     await env.DB.prepare('INSERT INTO document_checks (session_id, category, risk, findings, facts) VALUES (?, ?, ?, ?, ?)')
       .bind(sessionId, 'submission', review.risk, JSON.stringify(review.findings), JSON.stringify({ salesRef })).run();
     if (review.risk === 'medium' || review.risk === 'high') {
