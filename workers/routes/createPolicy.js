@@ -296,7 +296,7 @@ export async function handleCreatePolicy(request, ctx, jsonResponse) {
     // Code 200 — success with warnings
     logWarning('edith_field_warnings', warnings, env, { salesRef });
     track('submitted', { policyNumber: edithResponse.policyNumber });
-    workerCtx?.waitUntil(recordSubmissionReview(env, body.sessionId, salesRef, body.idNumber));
+    workerCtx?.waitUntil(recordSubmissionReview(env, body.sessionId, salesRef, body.idNumber, body.applicationType === 'spouse' ? body.spouseIdNumber : undefined));
     writePolicyEvent({
       env,
       workerCtx,
@@ -329,7 +329,7 @@ export async function handleCreatePolicy(request, ctx, jsonResponse) {
   // ── Clean success ─────────────────────────────────────────────
   const policyNumber = edithResponse.policyNumber;
   track('submitted', { policyNumber });
-  workerCtx?.waitUntil(recordSubmissionReview(env, body.sessionId, salesRef, body.idNumber));
+  workerCtx?.waitUntil(recordSubmissionReview(env, body.sessionId, salesRef, body.idNumber, body.applicationType === 'spouse' ? body.spouseIdNumber : undefined));
   writePolicyEvent({
     env,
     workerCtx,
@@ -471,6 +471,34 @@ function sanitizeOptionalFields(input, isBike = false) {
     if (t.length >= 9 && t.length <= 20) b.taxNumber = t; else delete b.taxNumber;
   }
 
+  // Spouse applications: the spouse's own employment, income and expenses. Each piece is optional and dropped when malformed.
+  if (b.applicationType !== 'spouse') {
+    for (const k of Object.keys(b)) if (k.startsWith('spouse') && !SPOUSE_IDENTITY_FIELDS.has(k)) delete b[k];
+  } else {
+    if (b.spouseTaxNumber != null) {
+      const t = String(b.spouseTaxNumber).replace(/\D/g, '');
+      if (t.length >= 9 && t.length <= 20) b.spouseTaxNumber = t; else delete b.spouseTaxNumber;
+    }
+    if (b.spouseEmploymentType != null && !['EMPLOYED', 'SELF-EMPLOYED', 'RETIRED'].includes(String(b.spouseEmploymentType))) delete b.spouseEmploymentType;
+    if (b.spouseGender != null && !['MALE', 'FEMALE'].includes(String(b.spouseGender))) delete b.spouseGender;
+    for (const k of ['spouseEmployerName', 'spouseOccupation']) {
+      if (b[k] != null) { const v = String(b[k]).trim().slice(0, 100); if (v) b[k] = v; else delete b[k]; }
+    }
+    if (b.spouseEmploymentStartDate != null && !/^\d{2}-[A-Za-z]{3}-\d{4}$/.test(String(b.spouseEmploymentStartDate))) delete b.spouseEmploymentStartDate;
+    if (b.spouseSalaryDay != null) { const n = Number(b.spouseSalaryDay); if (Number.isInteger(n) && n >= 1 && n <= 31) b.spouseSalaryDay = n; else delete b.spouseSalaryDay; }
+    for (const k of ['spouseBasicSalary', 'spouseNettSalary']) {
+      if (b[k] != null) { const n = Number(b[k]); if (Number.isFinite(n) && n > 0) b[k] = n; else delete b[k]; }
+    }
+    if (b.spouseExpenses && typeof b.spouseExpenses === 'object' && !Array.isArray(b.spouseExpenses)) {
+      const clean = {};
+      for (const tag of SPOUSE_EXPENSE_TAGS) {
+        const n = Number(b.spouseExpenses[tag]);
+        if (Number.isFinite(n) && n > 0) clean[tag] = n;
+      }
+      b.spouseExpenses = clean;
+    } else delete b.spouseExpenses;
+  }
+
   for (const k of OPTIONAL_MONEY_FIELDS) {
     if (b[k] == null || b[k] === '') { delete b[k]; continue; }
     const n = Number(b[k]);
@@ -509,6 +537,15 @@ function sanitizeOptionalFields(input, isBike = false) {
 
   return b;
 }
+
+// Spouse fields that exist on every married applicant's request (name, ID); everything else on a spouse is for spouse applications only.
+const SPOUSE_IDENTITY_FIELDS = new Set(['spouseTitle', 'spouseFirstName', 'spouseLastName', 'spouseIdNumber', 'spouseIdType']);
+// Person expense elements the spouse may carry (same elements as the client).
+const SPOUSE_EXPENSE_TAGS = [
+  'LoanRepayments', 'VehicleRepayments', 'InsurancePayments', 'MunicipalPayments', 'BondRentPayments', 'CreditCardPayments',
+  'FurnitureAccountPayments', 'ClothingAccountPayments', 'OverdraftPayments', 'TelephonePayments', 'TransportCosts',
+  'FoodEntertainmentCosts', 'EducationCosts', 'ChildMaintenance', 'HouseHoldExpenses', 'OtherPayments', 'SecurityPayments',
+];
 
 // Edith element names (lower-case) that may be dropped if Edith rejects them.
 const OPTIONAL_EDITH_FIELDS = new Set([
@@ -815,12 +852,23 @@ function buildEdithXML(data, companyCode, companyPass, dealer, salesRef) {
              FleetAssist/OtherIncome/Rebate, none of which this flow uses,
              so RetailPrice doubles as selling price here. */ ''}
         ${d.retailPrice ? `<tem:RetailPrice>${Number(d.retailPrice).toFixed(2)}</tem:RetailPrice>` : ''}
-        ${d.spouseFirstName && d.maritalStatus?.toUpperCase() === 'MARRIED' ? `
+        ${d.spouseFirstName && (d.maritalStatus?.toUpperCase() === 'MARRIED' || d.applicationType === 'spouse') ? `
         <tem:Spouse>
+          ${d.spouseTitle     ? `<tem:Title>${esc(String(d.spouseTitle).toUpperCase())}</tem:Title>` : ''}
           ${d.spouseFirstName ? `<tem:FirstName>${esc(d.spouseFirstName)}</tem:FirstName>` : ''}
           ${d.spouseLastName  ? `<tem:LastName>${esc(d.spouseLastName)}</tem:LastName>` : ''}
           <tem:IDType>${esc(d.spouseIdType || 'RSA ID')}</tem:IDType>
           ${d.spouseIdNumber  ? `<tem:IDNumber>${esc(d.spouseIdNumber)}</tem:IDNumber>` : ''}
+          ${d.spouseGender    ? `<tem:Gender>${esc(d.spouseGender)}</tem:Gender>` : ''}
+          ${d.spouseTaxNumber ? `<tem:TaxRegisteredInd>-1</tem:TaxRegisteredInd><tem:TaxNumber>${esc(String(d.spouseTaxNumber).slice(0, 20))}</tem:TaxNumber>` : ''}
+          ${d.spouseEmploymentType ? `<tem:EmploymentType>${esc(d.spouseEmploymentType)}</tem:EmploymentType>` : ''}
+          ${d.spouseEmployerName ? `<tem:EmployerName>${esc(d.spouseEmployerName)}</tem:EmployerName>` : ''}
+          ${d.spouseOccupation ? `<tem:Occupation>${esc(d.spouseOccupation)}</tem:Occupation>` : ''}
+          ${d.spouseEmploymentStartDate ? `<tem:CurrentEmploymentStartDate>${esc(d.spouseEmploymentStartDate)}</tem:CurrentEmploymentStartDate>` : ''}
+          ${d.spouseSalaryDay ? `<tem:SalaryDay>${Number(d.spouseSalaryDay)}</tem:SalaryDay>` : ''}
+          ${d.spouseBasicSalary ? `<tem:BasicSalary>${Number(d.spouseBasicSalary).toFixed(2)}</tem:BasicSalary>` : ''}
+          ${d.spouseNettSalary ? `<tem:NettSalary>${Number(d.spouseNettSalary).toFixed(2)}</tem:NettSalary>` : ''}
+          ${d.spouseExpenses ? SPOUSE_EXPENSE_TAGS.map((t) => moneyTag(t, d.spouseExpenses[t])).join('\n          ') : ''}
         </tem:Spouse>` : ''}
         ${d.nextOfKinFirstName ? `
         <tem:RelativeRelation>DISTANT</tem:RelativeRelation>
