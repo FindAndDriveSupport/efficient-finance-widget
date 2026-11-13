@@ -12,7 +12,7 @@
  * own errors and recordProgressEvent() never throws.
  */
 
-const STEPS = new Set(['vehicle', 'applicant', 'employment', 'financial', 'documents', 'submitted']);
+const STEPS = new Set(['vehicle', 'applicant', 'employment', 'financial', 'documents', 'spouse', 'submitted']);
 const EVENTS = new Set(['entered', 'submitted', 'failed', 'manual_followup']);
 const MAX_EVENTS_PER_SESSION = 200;
 const DROP_OFF_AFTER_MS = 30 * 60 * 1000; // no activity for 30 min and not submitted = dropped off
